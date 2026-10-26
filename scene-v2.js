@@ -20,10 +20,9 @@ import {RoomEnvironment} from './vendor/addons/environments/RoomEnvironment.js';
 const canvas=document.querySelector('#scene');
 const mobileDevice=matchMedia('(max-width:680px), (pointer:coarse)').matches;
 const renderer=new T.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true});
-// Mobile Safari renders the canvas at the backing-store resolution. A 1.25 cap
-// looks soft on Retina screens, so keep a sharper mobile buffer while still
-// limiting GPU memory on phones.
-renderer.setPixelRatio(Math.min(devicePixelRatio,mobileDevice?2:1.75));
+// Mobile Safari renders the canvas at the backing-store resolution. Keep the
+// Retina buffer sharper than the old 1.25 cap, while limiting GPU use on phones.
+renderer.setPixelRatio(Math.min(devicePixelRatio,mobileDevice?1.5:1.75));
 renderer.outputColorSpace=T.SRGBColorSpace;
 renderer.toneMapping=T.ACESFilmicToneMapping;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;
