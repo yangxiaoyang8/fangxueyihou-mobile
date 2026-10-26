@@ -160,6 +160,15 @@ function roomDetails(p,def){
   // second bin here made every interior artificially symmetrical.
   if(kind==='barber'){const folded=fabric('#a3b5b4');for(let i=0;i<3;i++)box(p,.34,.035,.24,folded,-w/2+.47,1.03+i*.04,-d/2+.51);}
 }
+function buildInteriorDetails(inside,def,level){
+  if(def.kind==='bookshop')furnishBook(inside,def.w,def.d,level===1);
+  district.furnish(inside,def,level===1);
+  roomDetails(inside,def);
+  if(level===0){addPeriodPrints(inside,def);addPhotographicGoods(inside,def);}
+  fixture(inside,0,2.85,.15,def.kind==='cyber'?'#b2c5e4':'#ffcf91',def.kind==='cyber'?3.5:4.5);
+  if(def.kind==='bookshop'||def.kind==='cyber')fixture(inside,0,2.85,-1.55,def.kind==='cyber'?'#c7bad7':'#ffe1b6',2.5);
+  if(level===0&&['tea','noodles','bakery','shop','mianpi'].includes(def.kind))fixture(inside,-def.w*.12,2.52,def.d/2-.62,'#ffdda8',2.9);
+}
 const wallAgeMap=texture((c,s)=>{c.clearRect(0,0,s,s);for(let i=0;i<1800;i++){const x=rand()*s,y=s*(.6+rand()*.4),r=1+rand()*10;c.fillStyle='rgba(58,54,40,'+(.025+rand()*.07)+')';c.beginPath();c.ellipse(x,y,r,r*.4,0,0,6.28);c.fill();}for(let i=0;i<35;i++){const x=rand()*s,len=s*(.08+rand()*.4),gr=c.createLinearGradient(0,0,0,len);gr.addColorStop(0,'#403b2833');gr.addColorStop(1,'#403b2800');c.fillStyle=gr;c.fillRect(x,0,2+rand()*5,len);}for(let i=0;i<45;i++){const x=rand()*s,y=rand()*s;c.strokeStyle='#665b3b30';c.lineWidth=.7;c.beginPath();c.moveTo(x,y);c.lineTo(x+4,y+8);c.lineTo(x+2,y+12);c.stroke();}},512);
 function wallAge(p,w,h,x,y,z,angle=0){const m=new T.MeshStandardMaterial({map:wallAgeMap,transparent:true,opacity:.8,depthWrite:false,roughness:1,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});const plane=mesh(p,new T.PlaneGeometry(w,h),m,x,y,z);plane.rotation.y=angle;plane.castShadow=false;return plane;}
 function building(def){const root=group(world,def.x,.18,def.z,def.angle);root.userData.id=def.id;const house={...def,root,floors:[],outside:group(root)};stores.set(def.id,house);pickables.push(root);
@@ -167,7 +176,7 @@ function building(def){const root=group(world,def.x,.18,def.z,def.angle);root.us
   for(let k=0;k<3;k++)box(house.outside,def.w+.5,.085,.3,pavement,0,-.05-k*.055,def.d/2+.35+k*.22);
   const wallMat=plaster(def.color),baseMat=plaster(def.base||'#477669');
   wallMat.userData.metersPerTile=2;baseMat.userData.metersPerTile=2;
-  for(let level=0;level<def.levels;level++){const floor=group(root,0,level*3.3,0),shell=group(floor),front=group(floor),inside=group(floor),roof=group(floor);house.floors.push({floor,shell,front,inside,roof,insideBatched:false});
+  for(let level=0;level<def.levels;level++){const floor=group(root,0,level*3.3,0),shell=group(floor),front=group(floor),inside=group(floor),roof=group(floor);house.floors.push({floor,shell,front,inside,roof,insideBatched:false,insideBuilt:false});
     if(level>0){box(shell,def.w-1.05,.16,def.d,floorMat,-.525,.08,0);box(shell,1.05,.16,1.1,floorMat,def.w/2-.525,.08,def.d/2-.55);box(shell,1.05,.16,.65,floorMat,def.w/2-.525,.08,-def.d/2+.325);}else box(shell,def.w,.16,def.d,floorMat,0,.08,0);
     box(shell,def.w,3.15,.18,wallMat,0,1.67,-def.d/2);
     if(level===0){box(shell,def.w,.78,.035,brickFinish,0,.57,-def.d/2-.11);for(const side of [-1,1])box(shell,.035,.78,def.d,brickFinish,side*(def.w/2+.11),.57,0);}
@@ -239,15 +248,7 @@ function building(def){const root=group(world,def.x,.18,def.z,def.angle);root.us
       else if(!gabledRoof){box(roof,.48,.5,.48,mat('#8b8376'),-def.w*.3,3.63,-def.d*.25);box(roof,.58,.08,.58,iron,-def.w*.3,3.92,-def.d*.25);}
       if(!['shop','barber','fashion','mianpi'].includes(def.kind))plant(roof,def.w*.33,3.4,def.d*.3,.85);
     }
-    if(def.kind==='bookshop')furnishBook(inside,def.w,def.d,level===1);
-    district.furnish(inside,def,level===1);
-    roomDetails(inside,def);
-    if(level===0){addPeriodPrints(inside,def);addPhotographicGoods(inside,def);}
-    fixture(inside,0,2.85,.15,def.kind==='cyber'?'#b2c5e4':'#ffcf91',def.kind==='cyber'?3.5:4.5);
-    if(def.kind==='bookshop'||def.kind==='cyber')
-      fixture(inside,0,2.85,-1.55,def.kind==='cyber'?'#c7bad7':'#ffe1b6',2.5);
-    if(level===0&&['tea','noodles','bakery','shop','mianpi'].includes(def.kind))
-      fixture(inside,-def.w*.12,2.52,def.d/2-.62,'#ffdda8',2.9);
+    if(!mobileDevice){buildInteriorDetails(inside,def,level);house.floors[level].insideBuilt=true;}
   }
   ac(house.outside,def.w/2+.03,2.4,def.d/2-.8).rotation.y=Math.PI/2;
   const brickwork=group(house.outside,def.w/2+.105,.4,-.3,Math.PI/2);for(let row=0;row<4;row++)for(let col=0;col<5-row%2;col++)box(brickwork,.23,.095,.025,mat(['#9d6b51','#ae7958','#8f6351'][(col+row)%3]),col*.25+(row%2)*.12,row*.11,0);
@@ -479,7 +480,7 @@ let streetMode=false;
 function hideWalkControls(){walkKeys.clear();document.querySelector('#viewCtrl [data-value="front"]').textContent='到店门口';controls.enabled=true;camera.fov=39;camera.updateProjectionMatrix();document.querySelector('#walkCtrl').hidden=true;document.querySelector('#lookCtrl').hidden=true;}
 function exterior(){streetMode=false;state.open=false;state.store=null;state.floor=0;hideWalkControls();controls.minDistance=13;controls.maxDistance=70;controls.maxPolarAngle=1.45;syncVisibility();setCamera(new T.Vector3(8,34,50),new T.Vector3(0,2,3.0));document.querySelector('#sceneName').textContent='放学后的校门口';document.querySelector('#sceneEyebrow').textContent='2005 · '+lightingAt(state.time,state.weather).label;document.querySelector('#sceneCaption').textContent='拖动旋转 · 滚轮缩放 · 点击店铺';syncUI();}
 function focusStorefront(id){const s=stores.get(id);if(!s)return;streetMode=false;state.open=false;state.store=id;state.floor=0;hideWalkControls();controls.minDistance=1.7;controls.maxDistance=45;controls.maxPolarAngle=1.48;syncVisibility();const target=new T.Vector3(0,1.65,s.d/2+.15),pos=new T.Vector3(.3,4.1,s.d/2+6);s.root.updateMatrixWorld(true);s.root.localToWorld(target);s.root.localToWorld(pos);setCamera(pos,target);document.querySelector('#sceneName').textContent=s.name.replace('☆ ','');document.querySelector('#sceneEyebrow').textContent='店前街景 · 可沿人行道靠近';document.querySelector('#sceneCaption').textContent='拖动看店门 · 点击「一层」进入室内';syncUI();}
-function enter(id,level=0){const s=stores.get(id);if(!s)return;streetMode=false;state.store=id;state.floor=Math.min(level,s.levels-1);if(mobileDevice){const selectedFloor=s.floors[state.floor];if(!selectedFloor.insideBatched){batch(selectedFloor.inside);selectedFloor.insideBatched=true;}}if(mobileDevice&&id==='tea')loadShopInterior(id,'seven_cups_tea_v2.glb');if(mobileDevice&&id==='noodles')loadShopInterior(id,'xiaoling_noodles.glb');state.open=true;hideWalkControls();controls.minDistance=3;controls.maxDistance=25;controls.maxPolarAngle=1.46;syncVisibility();const y=state.floor*3.3;const position=new T.Vector3(.7,y+4.6,s.d/2+6.3);const target=new T.Vector3(0,y+1.35,-.2);s.root.updateMatrixWorld(true);s.root.localToWorld(position);s.root.localToWorld(target);setCamera(position,target);document.querySelector('#sceneName').textContent=s.name.replace('☆ ','');document.querySelector('#sceneEyebrow').textContent='临街立面展开 · '+(level?'二层':'一层');document.querySelector('#sceneCaption').textContent='墙面、门窗、雨棚、屋顶已移开 · 点击屏幕换台';syncUI();soundscape.playEffect('door');}
+function enter(id,level=0){const s=stores.get(id);if(!s)return;streetMode=false;state.store=id;state.floor=Math.min(level,s.levels-1);if(mobileDevice){const selectedFloor=s.floors[state.floor];if(!selectedFloor.insideBuilt){buildInteriorDetails(selectedFloor.inside,s,state.floor);selectedFloor.insideBuilt=true;}if(!selectedFloor.insideBatched){batch(selectedFloor.inside);selectedFloor.insideBatched=true;}}if(mobileDevice&&id==='tea')loadShopInterior(id,'seven_cups_tea_v2.glb');if(mobileDevice&&id==='noodles')loadShopInterior(id,'xiaoling_noodles.glb');state.open=true;hideWalkControls();controls.minDistance=3;controls.maxDistance=25;controls.maxPolarAngle=1.46;syncVisibility();const y=state.floor*3.3;const position=new T.Vector3(.7,y+4.6,s.d/2+6.3);const target=new T.Vector3(0,y+1.35,-.2);s.root.updateMatrixWorld(true);s.root.localToWorld(position);s.root.localToWorld(target);setCamera(position,target);document.querySelector('#sceneName').textContent=s.name.replace('☆ ','');document.querySelector('#sceneEyebrow').textContent='临街立面展开 · '+(level?'二层':'一层');document.querySelector('#sceneCaption').textContent='墙面、门窗、雨棚、屋顶已移开 · 点击屏幕换台';syncUI();soundscape.playEffect('door');}
 function focusNewsstand(){exterior();controls.minDistance=1.3;controls.maxDistance=35;newsstand.updateWorldMatrix(true,false);setCamera(newsstand.localToWorld(new T.Vector3(.5,2.5,5)),newsstand.localToWorld(new T.Vector3(0,1.5,.5)));document.querySelector('#sceneName').textContent='街口报刊亭';document.querySelector('#sceneEyebrow').textContent='2003–2005 · 街边报刊';document.querySelector('#sceneCaption').textContent='街口买一本杂志，再慢慢走向学校';}
 function focusNewsstandSide(){exterior();controls.minDistance=1.3;controls.maxDistance=35;newsstand.updateWorldMatrix(true,false);setCamera(newsstand.localToWorld(new T.Vector3(-5,2.3,1)),newsstand.localToWorld(new T.Vector3(-1.2,1.5,0)));document.querySelector('#sceneName').textContent='报刊亭侧架';document.querySelector('#sceneEyebrow').textContent='2003–2005 · 杂志侧架';document.querySelector('#sceneCaption').textContent='青年视觉 · 奥秘 · ELLE · 中国时装 / 时尚芭莎';}
 function focusStall(stall,title){exterior();controls.minDistance=1.1;controls.maxDistance=25;stall.updateWorldMatrix(true,false);setCamera(stall.localToWorld(new T.Vector3(1.25,2.25,3.6)),stall.localToWorld(new T.Vector3(0,1.16,0)));document.querySelector('#sceneName').textContent=title;document.querySelector('#sceneEyebrow').textContent='街边小摊 · 近看食材';document.querySelector('#sceneCaption').textContent='拖动旋转 · 观察托盘与独立食材模型';}
