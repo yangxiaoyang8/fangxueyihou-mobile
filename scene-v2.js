@@ -20,7 +20,10 @@ import {RoomEnvironment} from './vendor/addons/environments/RoomEnvironment.js';
 const canvas=document.querySelector('#scene');
 const mobileDevice=matchMedia('(max-width:680px), (pointer:coarse)').matches;
 const renderer=new T.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,mobileDevice?1.25:1.75));
+// Mobile Safari renders the canvas at the backing-store resolution. A 1.25 cap
+// looks soft on Retina screens, so keep a sharper mobile buffer while still
+// limiting GPU memory on phones.
+renderer.setPixelRatio(Math.min(devicePixelRatio,mobileDevice?2:1.75));
 renderer.outputColorSpace=T.SRGBColorSpace;
 renderer.toneMapping=T.ACESFilmicToneMapping;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;
@@ -565,23 +568,28 @@ for(const [kind,button,input,mediaKind] of [['tv','importTvVideoBtn','tvVideoFil
     customScreens[kind]=keptScreens;customUrls[kind]=keptUrls;
     const files=[...e.target.files],rejected=[];
     if(!files.length){e.target.value='';return;}
+    let pending=0,loaded=0;
     for(const file of files.slice(0,8)){
       if(kind==='tv'&&file.size>10*1024*1024){rejected.push(file.name+' 超过 10 MB');continue;}
       const type=mediaFileType(file),isVideo=kind==='tv'&&type?.kind==='video';
       if(!type||type.kind!==mediaKind){rejected.push(file.name+' 格式不支持');continue;}
       const source=isVideo?document.createElement('video'):new Image();
       const url=URL.createObjectURL(file);customUrls[kind].push(url);customScreens[kind].push(source);
+      pending++;
+      const markLoaded=()=>{loaded++;drawScreens(performance.now());if(loaded===pending)toast(kind==='tv'?'电视素材已显示，可以点击屏幕切换':'网吧屏幕图片已显示');};
       if(isVideo){
         source.muted=true;source.loop=true;source.playsInline=true;source.preload='auto';source.setAttribute('playsinline','');
-        source.addEventListener('loadeddata',()=>{if(state.screens)source.play().catch(()=>toast('视频已载入；若未播放，请点一下屏幕'));drawScreens(performance.now());},{once:true});
+        source.addEventListener('loadeddata',()=>{markLoaded();if(state.screens)source.play().catch(()=>toast('视频已显示；若未播放，请点一下电视屏幕'));},{once:true});
+        source.addEventListener('playing',()=>drawScreens(performance.now()));
         source.addEventListener('error',()=>{const index=customScreens[kind].indexOf(source);if(index>=0)customScreens[kind].splice(index,1);const urlIndex=customUrls[kind].indexOf(url);if(urlIndex>=0)customUrls[kind].splice(urlIndex,1);URL.revokeObjectURL(url);drawScreens(performance.now());toast(file.name+' 无法解码；请用 MP4（H.264）或 WebM 重试');},{once:true});
-      }else{source.dataset.animated=String(type.mime==='image/gif'||file.name.toLowerCase().endsWith('.gif'));source.onload=()=>drawScreens(performance.now());source.onerror=()=>toast(file.name+' 图片加载失败');}
+      }else{source.dataset.animated=String(type.mime==='image/gif'||file.name.toLowerCase().endsWith('.gif'));source.onload=markLoaded;source.onerror=()=>toast(file.name+' 图片加载失败');}
       source.src=url;
       if(isVideo)source.load();
     }
     if(files.length>8)rejected.push('一次最多导入 8 个文件');
     e.target.value='';
-    toast('已选择 '+customScreens[kind].length+' 个'+(kind==='tv'?'电视':'游戏')+'素材'+(rejected.length?'；'+rejected[0]:''));
+    drawScreens(performance.now());
+    toast((loaded<pending?'正在读取素材… ':'已选择 ')+customScreens[kind].length+' 个'+(kind==='tv'?'电视':'游戏')+'素材'+(rejected.length?'；'+rejected[0]:''));
   };
 }
 document.querySelector('#importPosterBtn').onclick=()=>document.querySelector('#posterFiles').click();
