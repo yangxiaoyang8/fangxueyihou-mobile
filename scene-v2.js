@@ -19,20 +19,19 @@ import {RoomEnvironment} from './vendor/addons/environments/RoomEnvironment.js';
 // front, roof, shell and furniture groups, so a cutaway cannot leave a lintel behind.
 const canvas=document.querySelector('#scene');
 const mobileDevice=matchMedia('(max-width:680px), (pointer:coarse)').matches;
-const renderer=new T.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true});
+const renderer=new T.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true,powerPreference:mobileDevice?'low-power':'high-performance',failIfMajorPerformanceCaveat:false});
 // Mobile Safari renders the canvas at the backing-store resolution. Keep the
 // Retina buffer sharper than the old 1.25 cap, while limiting GPU use on phones.
-renderer.setPixelRatio(Math.min(devicePixelRatio,mobileDevice?1.5:1.75));
+renderer.setPixelRatio(Math.min(devicePixelRatio,mobileDevice?1.35:1.75));
 renderer.outputColorSpace=T.SRGBColorSpace;
 renderer.toneMapping=T.ACESFilmicToneMapping;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;
 const scene=new T.Scene();
-const reflectionRoom=new RoomEnvironment(),pmrem=new T.PMREMGenerator(renderer);
-scene.environment=pmrem.fromScene(reflectionRoom,.035).texture;reflectionRoom.dispose();pmrem.dispose();
+if(!mobileDevice){const reflectionRoom=new RoomEnvironment(),pmrem=new T.PMREMGenerator(renderer);scene.environment=pmrem.fromScene(reflectionRoom,.035).texture;reflectionRoom.dispose();pmrem.dispose();}
 const camera=new T.PerspectiveCamera(39,1,.15,180);
 const controls=new OrbitControls(camera,canvas);
-const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));
-const bloom=new UnrealBloomPass(new T.Vector2(640,480),.3,.55,1.0);composer.addPass(bloom);composer.addPass(new OutputPass());
+let composer=null;
+if(!mobileDevice){composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));const bloom=new UnrealBloomPass(new T.Vector2(640,480),.3,.55,1.0);composer.addPass(bloom);composer.addPass(new OutputPass());}
 controls.enableDamping=true;controls.dampingFactor=.08;controls.maxPolarAngle=1.48;
 const world=new T.Group();scene.add(world);
 const ambient=new T.HemisphereLight('#b9c4ef','#65516c',1.3);scene.add(ambient);
@@ -624,8 +623,10 @@ function render(now){
   if(precipitation.visible||rain.visible){for(let i=0;i<particleCount;i++){positions[i*3+1]-=dt*(state.weather==='rain'?16+flakeSizes[i]*4:.55+flakeSizes[i]*.55);positions[i*3]+=dt*(state.weather==='rain'?.5:Math.sin(now/1300+i)*.18);if(positions[i*3+1]<.1){positions[i*3+1]=15;positions[i*3]=(rand()-.5)*28;positions[i*3+2]=(rand()-.5)*40+3;}rainVertices.set([positions[i*3],positions[i*3+1],positions[i*3+2],positions[i*3]-.05,positions[i*3+1]+.35,positions[i*3+2]],i*6);}pgeo.attributes.position.needsUpdate=true;rainGeo.attributes.position.needsUpdate=true;}
   const movingTv=customScreens.tv.some(source=>source.tagName==='VIDEO'||source.dataset?.animated==='true');
   if(now-screenTick>(movingTv&&state.screens?40:250)){drawScreens(now);screenTick=now;}
-  composer.render();
+  if(mobileDevice)renderer.render(scene,camera);else composer.render();
 }
-function resize(){const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);composer.setSize(r.width,r.height);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}new ResizeObserver(resize).observe(canvas);resize();season();atmosphere();exterior();document.querySelector('#loading').remove();document.querySelector('#status').textContent='9 家可进入店铺 · 麻辣烫 / 炸串摊';requestAnimationFrame(render);
+function resize(){const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);if(!mobileDevice)composer.setSize(r.width,r.height);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
+if('ResizeObserver' in window)new ResizeObserver(resize).observe(canvas);else window.addEventListener('resize',resize,{passive:true});
+resize();season();atmosphere();exterior();document.querySelector('#loading').remove();document.querySelector('#status').textContent='9 家可进入店铺 · 麻辣烫 / 炸串摊';requestAnimationFrame(render);
 // Read-only diagnostics used to verify the actual scene graph and renderer.
 window.sceneQA=()=>({state:{...state},audio:soundscape.debugState(),stores:[...stores.values()].map(s=>({id:s.id,visible:s.root.visible,levels:s.floors.map(f=>({visible:f.floor.visible,front:f.front.visible,roof:f.roof.visible}))})),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,screenCount:screens.length,roomLights:lamps.filter(l=>l.type==='room').length,canvas:[canvas.width,canvas.height]});
