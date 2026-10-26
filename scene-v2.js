@@ -30,8 +30,8 @@ const scene=new T.Scene();
 if(!mobileDevice){const reflectionRoom=new RoomEnvironment(),pmrem=new T.PMREMGenerator(renderer);scene.environment=pmrem.fromScene(reflectionRoom,.035).texture;reflectionRoom.dispose();pmrem.dispose();}
 const camera=new T.PerspectiveCamera(39,1,.15,180);
 const controls=new OrbitControls(camera,canvas);
-let composer=null;
-if(!mobileDevice){composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));const bloom=new UnrealBloomPass(new T.Vector2(640,480),.3,.55,1.0);composer.addPass(bloom);composer.addPass(new OutputPass());}
+let composer=null,bloom=null;
+if(!mobileDevice){composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));bloom=new UnrealBloomPass(new T.Vector2(640,480),.3,.55,1.0);composer.addPass(bloom);composer.addPass(new OutputPass());}
 controls.enableDamping=true;controls.dampingFactor=.08;controls.maxPolarAngle=1.48;
 const world=new T.Group();scene.add(world);
 const ambient=new T.HemisphereLight('#b9c4ef','#65516c',1.3);scene.add(ambient);
@@ -305,9 +305,8 @@ for(const side of [-1,1]){
   box(rearWalkways,5.35,.055,.11,mat('#aaa08d'),side*5.9,.13,-9.65);
 }
 definitions.forEach(building);
-const barberMirrors=[];stores.get('barber').root.traverse(o=>{if(o.name==='barber-reflection-surface')barberMirrors.push(o);});
-const barberMirror=barberMirrors[0];
-const barberStudent=stores.get('barber').root.getObjectByName('barber-student-reflection');
+const barberMirrors=[],barberCapture=[];
+let barberMirror=null,barberStudent=null;
 const barberMirrorWorld=new T.Vector3();
 const mirrorVertexShader=`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
 const mirrorFragmentShader=`uniform sampler2D reflection;uniform vec2 pixel;varying vec2 vUv;
@@ -326,14 +325,25 @@ void main(){
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
-const barberCapture=barberMirrors.map((surface,i)=>{
+function initializeBarberMirrors(){
+  // Mobile interiors do not exist at startup. Bind reflections only after the
+  // ground-floor furniture is built, and keep the room safe to enter again.
+  if(barberMirror)return;
+  const inside=stores.get('barber').floors[0].inside;
+  inside.traverse(o=>{if(o.name==='barber-reflection-surface')barberMirrors.push(o);});
+  if(!barberMirrors.length)return;
+  barberMirror=barberMirrors[0];
+  barberStudent=inside.getObjectByName('barber-student-reflection')||null;
+  barberMirrors.forEach((surface,i)=>{
   const target=new T.WebGLRenderTarget(192,224,{minFilter:T.LinearFilter,magFilter:T.LinearFilter});
   const camera=new T.PerspectiveCamera(72,192/224,.1,20);
   camera.position.set(i===0?-1:.85,1.97,-stores.get('barber').d/2+.34);
   camera.rotation.set(-.16,Math.PI,0);stores.get('barber').floors[0].inside.add(camera);
   surface.material=new T.ShaderMaterial({uniforms:{reflection:{value:target.texture},pixel:{value:new T.Vector2(1/192,1/224)}},vertexShader:mirrorVertexShader,fragmentShader:mirrorFragmentShader,side:T.DoubleSide});
-  return {target,camera};
-});
+  barberCapture.push({target,camera});
+  });
+}
+initializeBarberMirrors();
 let barberMirrorCaptured=false;
 const interiorLoader=new GLTFLoader();
 function enrichInterior(model){const changed=new Map();model.traverse(o=>{if(!o.isMesh||Array.isArray(o.material))return;const original=o.material,name=original.name||'';if(!changed.has(original.uuid)){const m=original.clone();if(/钢|铝|黑铁/.test(name)){Object.assign(m,metalPBR);m.normalScale.set(.22,.22);}else if(/木/.test(name)){Object.assign(m,woodPBR);m.color.set('#c9b08a');m.userData.metersPerTile=2;}else if(/瓷砖/.test(name)){m.map=ceramic.map;m.normalMap=ceramic.normalMap;m.roughnessMap=ceramic.roughnessMap;m.normalScale.set(.35,.35);m.userData.metersPerTile=1.8;}changed.set(original.uuid,m);}o.material=changed.get(original.uuid);if(o.material.userData.metersPerTile){o.geometry=o.geometry.clone();const pos=o.geometry.attributes.position,n=o.geometry.attributes.normal,uv=o.geometry.attributes.uv,s=o.material.userData.metersPerTile;if(uv)for(let i=0;i<pos.count;i++){const nx=Math.abs(n.getX(i)),ny=Math.abs(n.getY(i));uv.setXY(i,(nx>.5?pos.getZ(i)*o.scale.z:pos.getX(i)*o.scale.x)/s,(ny>.5?pos.getZ(i)*o.scale.z:pos.getY(i)*o.scale.y)/s);}}});}
@@ -458,7 +468,7 @@ function atmosphere(){
 scene.fog=new T.Fog(bottom,a.overcast?35:55,a.overcast?85:125);shadowFloor.material.color.copy(top).multiplyScalar(.5);
   ambient.intensity=a.ambient;ambient.color.set(night>.5?'#93a9d5':'#b7c8df');ambient.groundColor.set(night>.5?'#242c43':'#716b66');
 sun.intensity=a.sun;sun.color.set(day>.5?'#fff0dc':'#ffc89b');sun.position.set(-18,10+day*20,8+day*6);sun.castShadow=night<.95;
-  fill.intensity=a.fill;fill.color.set('#91a9dd');renderer.toneMappingExposure=a.exposure;bloom.strength=a.bloom;
+  fill.intensity=a.fill;fill.color.set('#91a9dd');renderer.toneMappingExposure=a.exposure;if(bloom)bloom.strength=a.bloom;
   for(const l of lamps){const on=l.type==='street'?state.street:state.lights;l.light.intensity=on?l.power*a.lamps:0;l.bulb.visible=on;l.halo.visible=on;l.halo.material.opacity=on?.04*day+.22*dusk+.32*night:0;}
   for(const w of litWindows){w.material.emissiveIntensity=state.lights?a.windowGlow*w.power:0;w.material.color.set(night>.5?'#253043':'#a8b1ab');}
   for(const s of litSigns){s.material.emissiveIntensity=state.lights?s.power*(.08*day+.8*dusk+1.4*night):0;if(s.light)s.light.intensity=state.lights?3*a.lamps:0;}
@@ -474,13 +484,13 @@ const visited=new Set();scene.traverse(o=>{if(!o.isMesh)return;for(const m of Ar
 }
 function season(){const cols={spring:['#587748','#77905b','#8d9b61'],summer:['#3f6547','#547447','#6b814f'],autumn:['#a8733e','#b3904c','#9c5e3c'],winter:['#718077','#89928a','#a0a99e']}[state.season];foliageBatches.forEach((o,i)=>{o.material.color.set(cols[i%3]);o.visible=state.season!=='winter'||!o.userData.deciduous;});syncDressing();document.querySelector('#seasonValue').textContent=({spring:'春 · 新芽',summer:'夏 · 浓荫',autumn:'秋 · 金叶',winter:'冬 · 枝寒'})[state.season];syncSoundscape();}
 const environmentObjects=world.children.filter(o=>!o.userData.id&&o!==base&&o!==ground);
-function syncVisibility(){base.visible=ground.visible=shadowFloor.visible=!state.open;for(const o of environmentObjects)o.visible=!state.open;for(const s of stores.values()){const selected=s.id===state.store;s.root.visible=!state.open||selected;s.outside.visible=!state.open;for(let i=0;i<s.floors.length;i++){const f=s.floors[i];f.floor.visible=!state.open||i===state.floor;f.front.visible=!state.open;f.roof.visible=!state.open;}}for(const m of barberMirrors)m.visible=state.open&&state.store==='barber'&&state.floor===0;barberStudent.visible=false;barberStudent.material.opacity=0;barberMirrorCaptured=false;for(const l of lamps){let visible=true,p=l.light;while(p){if(!p.visible){visible=false;break;}p=p.parent;}l.light.castShadow=state.open&&visible&&l.type==='room';if(l.light.castShadow){l.light.shadow.mapSize.set(512,512);l.light.shadow.bias=-.001;l.light.shadow.normalBias=.025;}}precipitation.visible=state.weather==='snow'&&!state.open;syncDressing();syncSoundscape();}
+function syncVisibility(){base.visible=ground.visible=shadowFloor.visible=!state.open;for(const o of environmentObjects)o.visible=!state.open;for(const s of stores.values()){const selected=s.id===state.store;s.root.visible=!state.open||selected;s.outside.visible=!state.open;for(let i=0;i<s.floors.length;i++){const f=s.floors[i];f.floor.visible=!state.open||i===state.floor;f.front.visible=!state.open;f.roof.visible=!state.open;}}for(const m of barberMirrors)m.visible=state.open&&state.store==='barber'&&state.floor===0;if(barberStudent){barberStudent.visible=false;barberStudent.material.opacity=0;}barberMirrorCaptured=false;for(const l of lamps){let visible=true,p=l.light;while(p){if(!p.visible){visible=false;break;}p=p.parent;}l.light.castShadow=state.open&&visible&&l.type==='room';if(l.light.castShadow){l.light.shadow.mapSize.set(512,512);l.light.shadow.bias=-.001;l.light.shadow.normalBias=.025;}}precipitation.visible=state.weather==='snow'&&!state.open;syncDressing();syncSoundscape();}
 function setCamera(pos,target){controls.enableDamping=false;camera.position.copy(pos);controls.target.copy(target);controls.update();controls.enableDamping=true;}
 let streetMode=false;
 function hideWalkControls(){walkKeys.clear();document.querySelector('#viewCtrl [data-value="front"]').textContent='到店门口';controls.enabled=true;camera.fov=39;camera.updateProjectionMatrix();document.querySelector('#walkCtrl').hidden=true;document.querySelector('#lookCtrl').hidden=true;}
 function exterior(){streetMode=false;state.open=false;state.store=null;state.floor=0;hideWalkControls();controls.minDistance=13;controls.maxDistance=70;controls.maxPolarAngle=1.45;syncVisibility();setCamera(new T.Vector3(8,34,50),new T.Vector3(0,2,3.0));document.querySelector('#sceneName').textContent='放学后的校门口';document.querySelector('#sceneEyebrow').textContent='2005 · '+lightingAt(state.time,state.weather).label;document.querySelector('#sceneCaption').textContent='拖动旋转 · 滚轮缩放 · 点击店铺';syncUI();}
 function focusStorefront(id){const s=stores.get(id);if(!s)return;streetMode=false;state.open=false;state.store=id;state.floor=0;hideWalkControls();controls.minDistance=1.7;controls.maxDistance=45;controls.maxPolarAngle=1.48;syncVisibility();const target=new T.Vector3(0,1.65,s.d/2+.15),pos=new T.Vector3(.3,4.1,s.d/2+6);s.root.updateMatrixWorld(true);s.root.localToWorld(target);s.root.localToWorld(pos);setCamera(pos,target);document.querySelector('#sceneName').textContent=s.name.replace('☆ ','');document.querySelector('#sceneEyebrow').textContent='店前街景 · 可沿人行道靠近';document.querySelector('#sceneCaption').textContent='拖动看店门 · 点击「一层」进入室内';syncUI();}
-function enter(id,level=0){const s=stores.get(id);if(!s)return;streetMode=false;state.store=id;state.floor=Math.min(level,s.levels-1);if(mobileDevice){const selectedFloor=s.floors[state.floor];if(!selectedFloor.insideBuilt){buildInteriorDetails(selectedFloor.inside,s,state.floor);selectedFloor.insideBuilt=true;}if(!selectedFloor.insideBatched){batch(selectedFloor.inside);selectedFloor.insideBatched=true;}}if(mobileDevice&&id==='tea')loadShopInterior(id,'seven_cups_tea_v2.glb');if(mobileDevice&&id==='noodles')loadShopInterior(id,'xiaoling_noodles.glb');state.open=true;hideWalkControls();controls.minDistance=3;controls.maxDistance=25;controls.maxPolarAngle=1.46;syncVisibility();const y=state.floor*3.3;const position=new T.Vector3(.7,y+4.6,s.d/2+6.3);const target=new T.Vector3(0,y+1.35,-.2);s.root.updateMatrixWorld(true);s.root.localToWorld(position);s.root.localToWorld(target);setCamera(position,target);document.querySelector('#sceneName').textContent=s.name.replace('☆ ','');document.querySelector('#sceneEyebrow').textContent='临街立面展开 · '+(level?'二层':'一层');document.querySelector('#sceneCaption').textContent='墙面、门窗、雨棚、屋顶已移开 · 点击屏幕换台';syncUI();soundscape.playEffect('door');}
+function enter(id,level=0){const s=stores.get(id);if(!s)return;streetMode=false;state.store=id;state.floor=Math.min(level,s.levels-1);if(mobileDevice){const selectedFloor=s.floors[state.floor];if(!selectedFloor.insideBuilt){buildInteriorDetails(selectedFloor.inside,s,state.floor);selectedFloor.insideBuilt=true;if(id==='barber'&&state.floor===0)initializeBarberMirrors();atmosphere();}if(!selectedFloor.insideBatched){batch(selectedFloor.inside);selectedFloor.insideBatched=true;}}if(mobileDevice&&id==='tea')loadShopInterior(id,'seven_cups_tea_v2.glb');if(mobileDevice&&id==='noodles')loadShopInterior(id,'xiaoling_noodles.glb');state.open=true;hideWalkControls();controls.minDistance=3;controls.maxDistance=25;controls.maxPolarAngle=1.46;syncVisibility();const y=state.floor*3.3;const position=new T.Vector3(.7,y+4.6,s.d/2+6.3);const target=new T.Vector3(0,y+1.35,-.2);s.root.updateMatrixWorld(true);s.root.localToWorld(position);s.root.localToWorld(target);setCamera(position,target);document.querySelector('#sceneName').textContent=s.name.replace('☆ ','');document.querySelector('#sceneEyebrow').textContent='临街立面展开 · '+(level?'二层':'一层');document.querySelector('#sceneCaption').textContent='墙面、门窗、雨棚、屋顶已移开 · 点击屏幕换台';syncUI();soundscape.playEffect('door');}
 function focusNewsstand(){exterior();controls.minDistance=1.3;controls.maxDistance=35;newsstand.updateWorldMatrix(true,false);setCamera(newsstand.localToWorld(new T.Vector3(.5,2.5,5)),newsstand.localToWorld(new T.Vector3(0,1.5,.5)));document.querySelector('#sceneName').textContent='街口报刊亭';document.querySelector('#sceneEyebrow').textContent='2003–2005 · 街边报刊';document.querySelector('#sceneCaption').textContent='街口买一本杂志，再慢慢走向学校';}
 function focusNewsstandSide(){exterior();controls.minDistance=1.3;controls.maxDistance=35;newsstand.updateWorldMatrix(true,false);setCamera(newsstand.localToWorld(new T.Vector3(-5,2.3,1)),newsstand.localToWorld(new T.Vector3(-1.2,1.5,0)));document.querySelector('#sceneName').textContent='报刊亭侧架';document.querySelector('#sceneEyebrow').textContent='2003–2005 · 杂志侧架';document.querySelector('#sceneCaption').textContent='青年视觉 · 奥秘 · ELLE · 中国时装 / 时尚芭莎';}
 function focusStall(stall,title){exterior();controls.minDistance=1.1;controls.maxDistance=25;stall.updateWorldMatrix(true,false);setCamera(stall.localToWorld(new T.Vector3(1.25,2.25,3.6)),stall.localToWorld(new T.Vector3(0,1.16,0)));document.querySelector('#sceneName').textContent=title;document.querySelector('#sceneEyebrow').textContent='街边小摊 · 近看食材';document.querySelector('#sceneCaption').textContent='拖动旋转 · 观察托盘与独立食材模型';}
@@ -598,7 +608,7 @@ window.onkeydown=e=>{if(e.key==='Escape')exterior();};
 function captureBarberMirrors(){
   const previous=renderer.getRenderTarget();
   for(const surface of barberMirrors)surface.visible=false;
-  barberStudent.visible=false;
+  if(barberStudent)barberStudent.visible=false;
   const room=stores.get('barber').floors[0],frontWasVisible=room.front.visible,roofWasVisible=room.roof.visible;
   room.front.visible=true;room.roof.visible=true;
   for(const {target,camera:reflectionCamera} of barberCapture){renderer.setRenderTarget(target);renderer.clear();renderer.render(scene,reflectionCamera);}
@@ -612,7 +622,7 @@ function render(now){
   requestAnimationFrame(render);
   const elapsed=(now-last)/1000,dt=Math.min(.05,elapsed);last=now;
   if(streetMode)updateWalking(Math.min(1,elapsed));else controls.update();
-  if(barberMirror.visible){
+  if(barberMirror?.visible&&barberStudent){
     if(!barberMirrorCaptured)captureBarberMirrors();
     barberMirror.getWorldPosition(barberMirrorWorld);
     const distance=camera.position.distanceTo(barberMirrorWorld),proximity=T.MathUtils.clamp((10.1-distance)/2.3,0,1);
