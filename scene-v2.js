@@ -19,7 +19,7 @@ import {RoomEnvironment} from './vendor/addons/environments/RoomEnvironment.js';
 // front, roof, shell and furniture groups, so a cutaway cannot leave a lintel behind.
 const canvas=document.querySelector('#scene');
 const mobileDevice=matchMedia('(max-width:680px), (pointer:coarse)').matches;
-const renderer=new T.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true,powerPreference:mobileDevice?'low-power':'high-performance',failIfMajorPerformanceCaveat:false});
+const renderer=new T.WebGLRenderer({canvas,antialias:!mobileDevice,preserveDrawingBuffer:true,powerPreference:mobileDevice?'low-power':'high-performance',failIfMajorPerformanceCaveat:false});
 // Mobile Safari renders the canvas at the backing-store resolution. Keep the
 // Retina buffer sharper than the old 1.25 cap, while limiting GPU use on phones.
 renderer.setPixelRatio(Math.min(devicePixelRatio,mobileDevice?1.35:1.75));
