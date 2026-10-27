@@ -12,5 +12,9 @@ if(css.toLowerCase().includes('</style'))throw new Error('Unsafe inline style te
 html=html.replace(/<!-- MOBILE_STYLE_START -->[\s\S]*?<!-- MOBILE_STYLE_END -->/,'<!-- MOBILE_STYLE_START -->\n  <style>\n'+css+'\n  </style>\n  <!-- MOBILE_STYLE_END -->');
 const block='<!-- MOBILE_BOOT_START -->\n  <script>\n'+guard+'  </script>\n  <!-- MOBILE_BOOT_END -->';
 if(!html.includes('<!-- MOBILE_BOOT_START -->'))throw new Error('Missing boot block');
-fs.writeFileSync(page,html.replace(/<!-- MOBILE_BOOT_START -->[\s\S]*?<!-- MOBILE_BOOT_END -->/,block));
+html=html.replace(/<!-- MOBILE_BOOT_START -->[\s\S]*?<!-- MOBILE_BOOT_END -->/,block);
+const runtime=fs.readFileSync(path.join(root,'scene-mobile.bundle.js'),'utf8').replace(/<\/script/gi,'<\\/script').replace(/[ \t]+$/gm,'');
+if(!html.includes('<!-- MOBILE_RUNTIME_START -->'))throw new Error('Missing runtime block');
+html=html.replace(/<!-- MOBILE_RUNTIME_START -->[\s\S]*?<!-- MOBILE_RUNTIME_END -->/,'<!-- MOBILE_RUNTIME_START -->\n  <script id="sceneRuntime">\n'+runtime+'\n  </script>\n  <!-- MOBILE_RUNTIME_END -->');
+fs.writeFileSync(page,html);
 console.log('Bundle and inline startup guard updated.');
