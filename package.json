@@ -1,0 +1,6 @@
+{
+  "name": "fangxueyihou-mobile",
+  "private": true,
+  "scripts": {"build": "node build-mobile.cjs"},
+  "devDependencies": {"esbuild": "0.25.12"}
+}

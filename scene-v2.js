@@ -1,4 +1,4 @@
-import {texturePath,loadTextureImage,createTextureLoader,textureStatus,retryTextures} from './texture-format.js?v=102-shared-textures';
+import {texturePath,loadTextureImage,createTextureLoader,textureStatus,retryTextures,startTextureLoading} from './texture-format.js?v=102-shared-textures';
 import * as T from './vendor/three.module.js';
 import {OrbitControls} from './vendor/addons/controls/OrbitControls.js';
 import {GLTFLoader} from './vendor/addons/loaders/GLTFLoader.js';
@@ -14,6 +14,10 @@ import {RenderPass} from './vendor/addons/postprocessing/RenderPass.js';
 import {UnrealBloomPass} from './vendor/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from './vendor/addons/postprocessing/OutputPass.js';
 import {RoomEnvironment} from './vendor/addons/environments/RoomEnvironment.js';
+
+async function startScene(){
+async function bootStep(label){window.sceneBoot?.phase(label);await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));}
+await bootStep('正在创建三维画面…');
 
 // Geometry and textures are built separately. Each store has independent
 // front, roof, shell and furniture groups, so a cutaway cannot leave a lintel behind.
@@ -325,7 +329,7 @@ for(const side of [-1,1]){
   box(rearWalkways,5.35,.055,.11,mat('#aaa08d'),side*5.9,.13,-11.08);
   box(rearWalkways,5.35,.055,.11,mat('#aaa08d'),side*5.9,.13,-9.65);
 }
-definitions.forEach(building);
+for(let i=0;i<definitions.length;i++){building(definitions[i]);if(mobileDevice)await bootStep('正在创建店铺 '+(i+1)+' / '+definitions.length+'…');}
 const barberMirrors=[],barberCapture=[];
 let barberMirror=null,barberStudent=null;
 const barberMirrorWorld=new T.Vector3();
@@ -460,11 +464,12 @@ for(const p of [[-3.7,3],[3.2,8]]){const g=group(world,p[0],.08,p[1]);box(g,.45,
 // Merge each visibility layer separately: dense books/keys remain affordable,
 // while a facade can still be removed atomically without touching room furniture.
 function batch(g){g.updateWorldMatrix(true,true);const inverse=g.matrixWorld.clone().invert(),buckets=new Map(),remove=[];g.traverse(o=>{if(!o.isMesh||o.isInstancedMesh||o.userData.dynamic||Array.isArray(o.material))return;const key=o.material.uuid;if(!buckets.has(key))buckets.set(key,{material:o.material,geos:[]});const geo=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();geo.applyMatrix4(new T.Matrix4().multiplyMatrices(inverse,o.matrixWorld));buckets.get(key).geos.push(geo);remove.push(o);});for(const o of remove)o.removeFromParent();for(const bucket of buckets.values()){const geo=mergeGeometries(bucket.geos,false);if(geo){const m=mesh(g,geo,bucket.material);m.userData.batched=true;}for(const part of bucket.geos)part.dispose();}}
+await bootStep('正在整理街道与校门…');
 // Instance foliage, then batch opaque geometry independently for each cutaway layer.
 const seasonalTrees=group(world),foliageBatches=[],leafGroups=new Map();world.updateMatrixWorld(true);
 for(const leaf of foliage){const key=leaf.material.uuid+leaf.geometry.uuid;if(!leafGroups.has(key))leafGroups.set(key,[]);leafGroups.get(key).push(leaf);}
 for(const leaves of leafGroups.values()){const inst=new T.InstancedMesh(leaves[0].geometry,leaves[0].material.clone(),leaves.length);leaves.forEach((leaf,i)=>{inst.setMatrixAt(i,leaf.matrixWorld);leaf.removeFromParent();});inst.userData.deciduous=!!leaves[0].userData.deciduous;inst.castShadow=true;inst.receiveShadow=true;seasonalTrees.add(inst);foliageBatches.push(inst);}
-for(const s of stores.values()){for(const f of s.floors){batch(f.shell);batch(f.front);if(!mobileDevice){batch(f.inside);f.insideBatched=true;}batch(f.roof);}batch(s.outside);}
+for(const s of stores.values()){for(const f of s.floors){batch(f.shell);batch(f.front);if(!mobileDevice){batch(f.inside);f.insideBatched=true;}batch(f.roof);}batch(s.outside);if(mobileDevice)await bootStep('正在整理 '+s.name+'…');}
 for(const g of world.children){if(g.isGroup&&!g.userData.id&&g!==seasonalTrees&&g!==puddles&&g!==fallenLeaves)batch(g);}
 
 const particleCount=800,positions=new Float32Array(particleCount*3);for(let i=0;i<particleCount;i++){positions[i*3]=(rand()-.5)*28;positions[i*3+1]=rand()*15;positions[i*3+2]=(rand()-.5)*40+3;}
@@ -638,7 +643,7 @@ function captureBarberMirrors(){
   for(const surface of barberMirrors)surface.visible=true;
   barberMirrorCaptured=true;
 }
-let last=performance.now(),screenTick=0;
+let last=performance.now(),screenTick=0,firstFrame=false;
 function render(now){
   requestAnimationFrame(render);
   const elapsed=(now-last)/1000,dt=Math.min(.05,elapsed);last=now;
@@ -655,9 +660,13 @@ function render(now){
   const movingTv=customScreens.tv.some(source=>source.tagName==='VIDEO'||source.dataset?.animated==='true');
   if(now-screenTick>(movingTv&&state.screens?40:250)){drawScreens(now);screenTick=now;}
   if(mobileDevice)renderer.render(scene,camera);else composer.render();
+  if(!firstFrame&&renderer.info.render.calls>0){firstFrame=true;window.sceneBoot?.ready();document.querySelector('#loading')?.remove();startTextureLoading();}
 }
 function resize(){const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);if(!mobileDevice)composer.setSize(r.width,r.height);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
-if('ResizeObserver' in window)new ResizeObserver(resize).observe(canvas);else window.addEventListener('resize',resize,{passive:true});
-mobileTextureBudget(scene);resize();season();atmosphere();exterior();document.querySelector('#loading').remove();document.querySelector('#status').textContent='9 家可进入店铺 · 麻辣烫 / 炸串摊';requestAnimationFrame(render);
+if(typeof ResizeObserver==='function')new ResizeObserver(resize).observe(canvas);else window.addEventListener('resize',resize,{passive:true});
+mobileTextureBudget(scene);resize();season();atmosphere();exterior();document.querySelector('#status').textContent='9 家可进入店铺 · 麻辣烫 / 炸串摊';requestAnimationFrame(render);
 // Read-only diagnostics used to verify the actual scene graph and renderer.
 window.sceneQA=()=>({textures:textureStatus(),contextLost:renderer.getContext().isContextLost(),gpuTextures:renderer.info.memory.textures,state:{...state},audio:soundscape.debugState(),stores:[...stores.values()].map(s=>({id:s.id,visible:s.root.visible,levels:s.floors.map(f=>({visible:f.floor.visible,front:f.front.visible,roof:f.roof.visible}))})),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,screenCount:screens.length,roomLights:lamps.filter(l=>l.type==='room').length,canvas:[canvas.width,canvas.height]});
+
+}
+startScene().catch(error=>{window.sceneBoot?.fail(error.message||String(error));console.error(error);});

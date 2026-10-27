@@ -1,0 +1,16 @@
+const fs=require('node:fs');
+const path=require('node:path');
+const esbuild=require('esbuild');
+const root=__dirname;
+esbuild.buildSync({entryPoints:[path.join(root,'mobile-entry.js')],outfile:path.join(root,'scene-mobile.bundle.js'),bundle:true,format:'iife',target:['safari14'],minify:true,legalComments:'eof',logLevel:'info'});
+const guard=fs.readFileSync(path.join(root,'startup-guard.js'),'utf8');
+if(guard.toLowerCase().includes('</script'))throw new Error('Unsafe inline script terminator');
+const page=path.join(root,'index.html');
+let html=fs.readFileSync(page,'utf8');
+const css=['style.css','district-ui.css','audio-ui.css','mobile-ui.css'].map(file=>fs.readFileSync(path.join(root,file),'utf8')).join('\n');
+if(css.toLowerCase().includes('</style'))throw new Error('Unsafe inline style terminator');
+html=html.replace(/<!-- MOBILE_STYLE_START -->[\s\S]*?<!-- MOBILE_STYLE_END -->/,'<!-- MOBILE_STYLE_START -->\n  <style>\n'+css+'\n  </style>\n  <!-- MOBILE_STYLE_END -->');
+const block='<!-- MOBILE_BOOT_START -->\n  <script>\n'+guard+'  </script>\n  <!-- MOBILE_BOOT_END -->';
+if(!html.includes('<!-- MOBILE_BOOT_START -->'))throw new Error('Missing boot block');
+fs.writeFileSync(page,html.replace(/<!-- MOBILE_BOOT_START -->[\s\S]*?<!-- MOBILE_BOOT_END -->/,block));
+console.log('Bundle and inline startup guard updated.');

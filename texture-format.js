@@ -3,7 +3,7 @@ import * as T from './vendor/three.module.js';
 export const mobileTextures=matchMedia('(max-width:680px), (pointer:coarse)').matches;
 const pngAssets=new Set(['fashion-accessories-atlas-v1','fashion-garments-atlas-v1','student-mirror-reflection-v1','tea-pearl-seal-uv-v1']);
 const entries=new Map(),queue=[];
-let active=0;
+let active=0,paused=mobileTextures&&Boolean(window.sceneBoot?.deferTextures);
 const later=callback=>Promise.resolve().then(callback);
 
 // Export support does not tell us whether a browser can decode WebP.
@@ -61,6 +61,7 @@ async function decode(entry){
 }
 
 function pump(){
+  if(paused)return;
   while(active<(mobileTextures?3:6)&&queue.length){
     const entry=queue.shift();entry.status='pending';active++;
     decode(entry).finally(()=>{active--;publish();pump();});
@@ -95,6 +96,8 @@ class SharedTextureLoader extends T.TextureLoader {
   }
 }
 export function createTextureLoader(manager){return new SharedTextureLoader(manager);}
+
+export function startTextureLoading(){paused=false;pump();}
 
 export function retryTextures(){
   for(const entry of entries.values())if(entry.status==='failed'){
