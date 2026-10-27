@@ -173,7 +173,7 @@ function addShopPrints(p,kind,w,d){printedBoard(p,kind,0,2.67,-d/2+.14,2.78,.72,
 
 const roofFinish=new T.MeshStandardMaterial({map:pbrMap('RoofingTiles001','Color'),normalMap:pbrMap('RoofingTiles001','NormalGL'),roughnessMap:pbrMap('RoofingTiles001','Roughness'),color:'#aeb6b9',roughness:.9,normalScale:new T.Vector2(.85,.85)});roofFinish.userData.metersPerTile=2;
 weatherMaterials.push(weatherSurface(roofFinish,.95));
-const district=createDistrictKit({group,box,cyl,orb,rod,mesh,mat,table,chair,stool,crt,fan,plant,fixture,label,wood,iron,cream,timber,roofFinish,metalPBR,ceramic,fabric,bookCovers:covers,bookBacks,bookSpines,paperEdge});
+const district=createDistrictKit({group,box,cyl,orb,rod,mesh,mat,table,chair,stool,crt,fan,plant,fixture,label,wood,iron,cream,timber,roofFinish,metalPBR,ceramic,fabric,bookCovers:covers,bookBacks,bookSpines,paperEdge,bookshelf,book});
 function roomDetails(p,def){
   const {w,d,kind}=def,food=['tea','noodles','mianpi','bakery'].includes(kind);
   const trim=food?mat('#767d76',.5):wood;
@@ -201,7 +201,7 @@ function building(def){const root=group(world,def.x,.18,def.z,def.angle);root.us
   for(let k=0;k<3;k++)box(house.outside,def.w+.5,.085,.3,pavement,0,-.05-k*.055,def.d/2+.35+k*.22);
   const wallMat=plaster(def.color),baseMat=plaster(def.base||'#477669');
   wallMat.userData.metersPerTile=2;baseMat.userData.metersPerTile=2;
-  for(let level=0;level<def.levels;level++){const floor=group(root,0,level*3.3,0),shell=group(floor),front=group(floor),inside=group(floor),roof=group(floor);house.floors.push({floor,shell,front,inside,roof,insideBatched:false,insideBuilt:false});
+  for(let level=0;level<def.levels;level++){const floor=group(root,0,level*3.3,0),shell=group(floor),front=group(floor),inside=group(floor),roof=group(floor),preview=mobileDevice?group(floor):null;house.floors.push({floor,shell,front,inside,roof,preview,insideBatched:false,insideBuilt:false});if(preview){preview.name=def.id+"-street-interior-"+level;district.preview(preview,def,level===1);}
     if(level>0){box(shell,def.w-1.05,.16,def.d,floorMat,-.525,.08,0);box(shell,1.05,.16,1.1,floorMat,def.w/2-.525,.08,def.d/2-.55);box(shell,1.05,.16,.65,floorMat,def.w/2-.525,.08,-def.d/2+.325);}else box(shell,def.w,.16,def.d,floorMat,0,.08,0);
     box(shell,def.w,3.15,.18,wallMat,0,1.67,-def.d/2);
     if(level===0){box(shell,def.w,.78,.035,brickFinish,0,.57,-def.d/2-.11);for(const side of [-1,1])box(shell,.035,.78,def.d,brickFinish,side*(def.w/2+.11),.57,0);}
@@ -293,7 +293,7 @@ function building(def){const root=group(world,def.x,.18,def.z,def.angle);root.us
 const definitions=[
  {id:'bookshop',name:'诸葛亮读书社',kind:'bookshop',x:5.5,z:-3.2,w:6,d:5.3,levels:2,angle:-.66,color:'#c5ad79',base:'#416d5c',sign:'#244d42',awning:'#9b9c5d'},
  {id:'cyber',name:'☆ 星光网吧',kind:'cyber',x:-5.5,z:-2.7,w:6,d:5.4,levels:2,angle:.68,color:'#648082',base:'#376173',sign:'#35476f',ink:'#f4b8eb',awning:'#697b9e'},
- {id:'tea',name:'七杯茶奶茶店',kind:'tea',x:5.9,z:4.1,w:4.6,d:4.2,levels:1,angle:-.48,color:'#c6c8a5',base:'#68988a',sign:'#e1c993',ink:'#345a49',awning:'#c77341'},
+ {id:'tea',name:'七杯茶',kind:'tea',x:5.9,z:4.1,w:4.6,d:4.2,levels:1,angle:-.48,color:'#c6c8a5',base:'#68988a',sign:'#e1c993',ink:'#345a49',awning:'#c77341'},
  {id:'noodles',name:'小玲米线',kind:'noodles',x:-6.1,z:5.1,w:4.8,d:4.5,levels:1,angle:.48,color:'#c9aa82',base:'#9b5745',sign:'#d8ad61',ink:'#8e3c2c',awning:'#c99c45'},
  {id:'bakery',name:'面 包 坊',kind:'bakery',x:7.9,z:9.6,w:3.8,d:3.8,levels:1,angle:-.44,color:'#c3a68a',base:'#bd867f',sign:'#e1caa0',ink:'#8b4734',awning:'#b47775'},
  {id:'shop',name:'红星小卖部',kind:'shop',x:-8.6,z:-13,w:4.4,d:3.8,levels:1,angle:.18,color:'#b5aa8a',base:'#7b8170',sign:'#a34e3c',awning:'#a75a43'},
@@ -469,7 +469,7 @@ await bootStep('正在整理街道与校门…');
 const seasonalTrees=group(world),foliageBatches=[],leafGroups=new Map();world.updateMatrixWorld(true);
 for(const leaf of foliage){const key=leaf.material.uuid+leaf.geometry.uuid;if(!leafGroups.has(key))leafGroups.set(key,[]);leafGroups.get(key).push(leaf);}
 for(const leaves of leafGroups.values()){const inst=new T.InstancedMesh(leaves[0].geometry,leaves[0].material.clone(),leaves.length);leaves.forEach((leaf,i)=>{inst.setMatrixAt(i,leaf.matrixWorld);leaf.removeFromParent();});inst.userData.deciduous=!!leaves[0].userData.deciduous;inst.castShadow=true;inst.receiveShadow=true;seasonalTrees.add(inst);foliageBatches.push(inst);}
-for(const s of stores.values()){for(const f of s.floors){batch(f.shell);batch(f.front);if(!mobileDevice){batch(f.inside);f.insideBatched=true;}batch(f.roof);}batch(s.outside);if(mobileDevice)await bootStep('正在整理 '+s.name+'…');}
+for(const s of stores.values()){for(const f of s.floors){batch(f.shell);batch(f.front);if(!mobileDevice){batch(f.inside);f.insideBatched=true;}batch(f.roof);if(f.preview)batch(f.preview);}batch(s.outside);if(mobileDevice)await bootStep('正在整理 '+s.name+'…');}
 for(const g of world.children){if(g.isGroup&&!g.userData.id&&g!==seasonalTrees&&g!==puddles&&g!==fallenLeaves)batch(g);}
 
 const particleCount=800,positions=new Float32Array(particleCount*3);for(let i=0;i<particleCount;i++){positions[i*3]=(rand()-.5)*28;positions[i*3+1]=rand()*15;positions[i*3+2]=(rand()-.5)*40+3;}
@@ -510,7 +510,7 @@ const visited=new Set();scene.traverse(o=>{if(!o.isMesh)return;for(const m of Ar
 }
 function season(){const cols={spring:['#587748','#77905b','#8d9b61'],summer:['#3f6547','#547447','#6b814f'],autumn:['#a8733e','#b3904c','#9c5e3c'],winter:['#718077','#89928a','#a0a99e']}[state.season];foliageBatches.forEach((o,i)=>{o.material.color.set(cols[i%3]);o.visible=state.season!=='winter'||!o.userData.deciduous;});syncDressing();document.querySelector('#seasonValue').textContent=({spring:'春 · 新芽',summer:'夏 · 浓荫',autumn:'秋 · 金叶',winter:'冬 · 枝寒'})[state.season];syncSoundscape();}
 const environmentObjects=world.children.filter(o=>!o.userData.id&&o!==base&&o!==ground);
-function syncVisibility(){base.visible=ground.visible=shadowFloor.visible=!state.open;for(const o of environmentObjects)o.visible=!state.open;for(const s of stores.values()){const selected=s.id===state.store;s.root.visible=!state.open||selected;s.outside.visible=!state.open;for(let i=0;i<s.floors.length;i++){const f=s.floors[i];f.floor.visible=!state.open||i===state.floor;f.front.visible=!state.open;f.roof.visible=!state.open;}}for(const m of barberMirrors)m.visible=state.open&&state.store==='barber'&&state.floor===0;if(barberStudent){barberStudent.visible=false;barberStudent.material.opacity=0;}barberMirrorCaptured=false;for(const l of lamps){let visible=true,p=l.light;while(p){if(!p.visible){visible=false;break;}p=p.parent;}l.light.castShadow=state.open&&visible&&l.type==='room';if(l.light.castShadow){l.light.shadow.mapSize.set(512,512);l.light.shadow.bias=-.001;l.light.shadow.normalBias=.025;}}precipitation.visible=state.weather==='snow'&&!state.open;syncDressing();syncSoundscape();}
+function syncVisibility(){base.visible=ground.visible=shadowFloor.visible=!state.open;for(const o of environmentObjects)o.visible=!state.open;for(const s of stores.values()){const selected=s.id===state.store;s.root.visible=!state.open||selected;s.outside.visible=!state.open;for(let i=0;i<s.floors.length;i++){const f=s.floors[i];f.floor.visible=!state.open||i===state.floor;f.front.visible=!state.open;f.roof.visible=!state.open;if(mobileDevice){f.inside.visible=state.open;if(f.preview)f.preview.visible=!state.open;}}}for(const m of barberMirrors)m.visible=state.open&&state.store==='barber'&&state.floor===0;if(barberStudent){barberStudent.visible=false;barberStudent.material.opacity=0;}barberMirrorCaptured=false;for(const l of lamps){let visible=true,p=l.light;while(p){if(!p.visible){visible=false;break;}p=p.parent;}l.light.castShadow=state.open&&visible&&l.type==='room';if(l.light.castShadow){l.light.shadow.mapSize.set(512,512);l.light.shadow.bias=-.001;l.light.shadow.normalBias=.025;}}precipitation.visible=state.weather==='snow'&&!state.open;syncDressing();syncSoundscape();}
 function setCamera(pos,target){controls.enableDamping=false;camera.position.copy(pos);controls.target.copy(target);controls.update();controls.enableDamping=true;}
 let streetMode=false;
 function hideWalkControls(){walkKeys.clear();document.querySelector('#viewCtrl [data-value="front"]').textContent='到店门口';controls.enabled=true;camera.fov=39;camera.updateProjectionMatrix();document.querySelector('#walkCtrl').hidden=true;document.querySelector('#lookCtrl').hidden=true;}
@@ -666,7 +666,7 @@ function resize(){const r=canvas.getBoundingClientRect();renderer.setSize(r.widt
 if(typeof ResizeObserver==='function')new ResizeObserver(resize).observe(canvas);else window.addEventListener('resize',resize,{passive:true});
 mobileTextureBudget(scene);resize();season();atmosphere();exterior();document.querySelector('#status').textContent='9 家可进入店铺 · 麻辣烫 / 炸串摊';requestAnimationFrame(render);
 // Read-only diagnostics used to verify the actual scene graph and renderer.
-window.sceneQA=()=>({textures:textureStatus(),contextLost:renderer.getContext().isContextLost(),gpuTextures:renderer.info.memory.textures,state:{...state},audio:soundscape.debugState(),stores:[...stores.values()].map(s=>({id:s.id,visible:s.root.visible,levels:s.floors.map(f=>({visible:f.floor.visible,front:f.front.visible,roof:f.roof.visible}))})),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,screenCount:screens.length,roomLights:lamps.filter(l=>l.type==='room').length,canvas:[canvas.width,canvas.height]});
+window.sceneQA=()=>({textures:textureStatus(),contextLost:renderer.getContext().isContextLost(),gpuTextures:renderer.info.memory.textures,state:{...state},audio:soundscape.debugState(),stores:[...stores.values()].map(s=>({id:s.id,visible:s.root.visible,levels:s.floors.map(f=>({visible:f.floor.visible,front:f.front.visible,roof:f.roof.visible,insideBuilt:f.insideBuilt,insideVisible:f.inside.visible,previewVisible:f.preview?.visible||false,previewMeshes:f.preview?(()=>{let n=0;f.preview.traverse(o=>{if(o.isMesh)n++;});return n;})():0}))})),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,screenCount:screens.length,roomLights:lamps.filter(l=>l.type==='room').length,canvas:[canvas.width,canvas.height]});
 
 }
 startScene().catch(error=>{window.sceneBoot?.fail(error.message||String(error));console.error(error);});

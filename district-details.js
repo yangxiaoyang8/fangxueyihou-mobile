@@ -2,6 +2,7 @@ import {texturePath,loadTextureImage,createTextureLoader,mobileTextures} from '.
 import * as T from './vendor/three.module.js';
 import {GLTFLoader} from './vendor/addons/loaders/GLTFLoader.js';
 import {RoundedBoxGeometry} from './vendor/RoundedBoxGeometry.js';
+import {createMilkTeaCup} from './milk-tea-kit.js?v=102-shared-textures';
 
 // One image supplies many distinct object fronts; every packet and garment remains
 // a separate piece of scene geometry. Tile textures share the decoded image.
@@ -115,7 +116,7 @@ const friedTrayMaterial=new T.MeshStandardMaterial({map:friedTrayMap,roughness:.
 
 // All dimensions are scene metres. Every shop keeps a clear entrance and a working aisle.
 export function createDistrictKit(a){
-  const {group,box,cyl,orb,rod,mesh,mat,table,chair,stool,crt,fan,plant,fixture,label,wood,iron,cream,timber,roofFinish,metalPBR,ceramic,fabric,bookCovers,bookBacks,bookSpines,paperEdge}=a;
+  const {group,box,cyl,orb,rod,mesh,mat,table,chair,stool,crt,fan,plant,fixture,label,wood,iron,cream,timber,roofFinish,metalPBR,ceramic,fabric,bookCovers,bookBacks,bookSpines,paperEdge,bookshelf,book}=a;
   const steel=mat('#a0aaa6',.34,.7), dark=mat('#28383c'), tile=ceramic;Object.assign(steel,metalPBR);steel.normalScale.set(.25,.25);steel.userData.metersPerTile=.8;
   const glass=new T.MeshStandardMaterial({color:'#a5cec8',transparent:true,opacity:.16,roughness:.2,depthWrite:false,side:T.DoubleSide});
   const colors=['#a64a3e','#548b79','#c3a859','#617f9b','#b88087'];
@@ -438,5 +439,46 @@ export function createDistrictKit(a){
     else{rod(g,[0,.1,-.6],[0,2.45,-.6],.025,iron);const canopy=mesh(g,new T.ConeGeometry(1.5,.47,8,1,true),mat('#667c93'),0,2.48,-.6);canopy.rotation.y=.2;}
     label(g,soup?'麻 辣 烫':'现 炸 串 串',1.55,.35,c,'#e6cf9b',75).position.set(0,.6,.49);fixture(g,0,2.14,0,'#ffcd8f',3,'street');stool(g,1.4,.7,c);basket(g,-1.3,0,.5,.55,.4);return g;
   }
-  return {furnish,architecture,stall,basket,bottle,soft};
+  function preview(p,def,upper=false){
+    const {w,d,kind}=def;
+    // Real shop-specific props remain visible through street-facing windows.
+    // Detailed rooms are separate, so entering does not duplicate this stock.
+    if(kind==='bookshop'){
+      if(upper){box(p,1.5,.35,2.1,timber,-1.5,.32,-.7);box(p,1.45,.18,2.0,cream,-1.5,.59,-.7);box(p,1.35,.10,.36,mat('#d2c2a3'),-1.5,.74,-1.35);table(p,.8,-1,1.4,.8);chair(p,.8,-.1);box(p,.9,1.9,.6,timber,-2.1,.95,1.6);}
+      else{for(const x of [-1.5,.65]){const rack=bookshelf(p,1.95,true);rack.position.set(x,0,-d/2+.34);}const rack=bookshelf(p,2.8,true);rack.position.set(-w/2+.32,0,.1);rack.rotation.y=Math.PI/2;table(p,.95,.75,1.55,.75,.83);for(let i=0;i<3;i++)book(p,.5+i*.3,.9,.75,i,true);stool(p,.7,1.8,'#ad4932');}
+    }else if(kind==='cyber'){
+      for(const x of [-1.6,.45])for(const z of [-.6,.7]){const desk=table(p,x,z,1.5,.7,.76);crt(desk,0,.8,-.12);box(desk,.48,.025,.17,cream,0,.81,.21);chair(p,x,z+.65);}
+    }else if(kind==='tea'){
+      box(p,2.65,.92,.72,mat('#718d7c'),-.3,.56,.65);box(p,2.75,.07,.8,timber,-.3,1.05,.65);
+      for(let i=0;i<3;i++){const cup=createMilkTeaCup(i);cup.position.set(-.95+i*.4,1.09,.62);p.add(cup);}
+      box(p,w-.65,.9,.68,cream,0,.56,-d/2+.5);box(p,w-.5,.06,.76,steel,0,1.05,-d/2+.5);
+      for(const x of [-.8,.7]){box(p,.5,.65,.42,steel,x,1.41,-d/2+.46);box(p,.35,.15,.02,dark,x,1.48,-d/2+.69);}
+      stool(p,-.9,1.65,'#b58b70');stool(p,.35,1.65,'#b58b70');
+    }else if(kind==='shop'){
+      const back=shelf(p,-.4,-d/2+.34,w-1.2);
+      for(let row=0;row<3;row++)for(let j=0;j<6;j++)packet(back,-1.1+j*.42,.43+row*.44,.08,(row*6+j)%16,.25,.3,.09);
+      for(let j=0;j<6;j++)bottle(back,-1.1+j*.42,1.59,.08,j);
+      box(p,1.8,.9,.65,mat('#8d7555'),-.55,.5,d/2-.9);box(p,1.9,.06,.73,timber,-.55,.98,d/2-.9);box(p,.34,.19,.28,cream,.05,1.11,d/2-1.0);
+      const fridge=group(p,w/2-.5,0,-d/2+.65);box(fridge,.85,1.95,.9,mat('#993f35'),0,1,0);box(fridge,.7,1.6,.02,dark,0,1.03,.47);for(let j=0;j<3;j++)bottle(fridge,-.2+j*.2,.37,.5,j);
+    }else if(kind==='bakery'){
+      box(p,2.25,.7,.72,mat('#9e6b5d'),-.25,.44,.5);
+      for(const y of [.9,1.25]){box(p,2.18,.025,.68,steel,-.25,y,.5);for(let i=0;i<5;i++)bun(p,-1.1+i*.42,y+.08,.53,i,.8);}
+      box(p,2.25,.7,.012,glass,-.25,1.14,.86);box(p,2.25,.018,.76,glass,-.25,1.52,.5);
+      const back=shelf(p,-.7,-d/2+.35,2.15);for(let i=0;i<5;i++)bun(back,-.8+i*.4,1.18,0,i,.9);
+      box(p,.85,1.8,.88,steel,w/2-.62,.9,-d/2+.65);for(let r=0;r<3;r++)box(p,.7,.3,.025,dark,w/2-.62,.4+r*.5,-d/2+1.11);
+    }else if(kind==='fashion'){
+      rod(p,[-w/2+.55,.1,-1.2],[-w/2+.55,2.3,-1.2],.025,steel);rod(p,[-w/2+.55,2.3,-1.2],[-w/2+.55,2.3,1.1],.025,steel);
+      for(let i=0;i<4;i++)garment(p,-w/2+.6,1.7,-1+i*.6,i,i===1,Math.PI/2);
+      const island=table(p,.3,.5,1.2,.8,.75);for(let i=0;i<3;i++)box(island,.38,.07,.3,foldFaces[i],-.32+i*.32,.86,0);canvasBag(island,.3,.79,-.05,-.12).scale.setScalar(.65);
+    }else if(kind==='barber'){
+      for(const x of [-1,.85]){box(p,1.18,1.37,.1,mat('#405f59'),x,1.97,-d/2+.15);box(p,1.02,1.2,.015,mat('#aabbb7',.3,.2),x,1.97,-d/2+.22);box(p,1.35,.09,.43,timber,x,1.18,-d/2+.35);cyl(p,.31,.07,steel,x,.12,-.25);box(p,.58,.16,.6,mat('#6d3935'),x,.66,-.25);box(p,.6,.65,.14,mat('#6d3935'),x,.95,.03);}
+      box(p,.55,.22,1.35,fabric('#52726c'),-w/2+.4,.5,.92);box(p,.12,.55,1.35,fabric('#52726c'),-w/2+.16,.85,.92);
+    }else if(kind==='noodles'||kind==='mianpi'){
+      box(p,w-.55,.9,.78,mat(kind==='mianpi'?'#6c8f86':'#b0a993'),0,.5,-d/2+.62);box(p,w-.42,.07,.9,steel,0,.99,-d/2+.62);
+      cyl(p,.35,.48,steel,-1,1.27,-d/2+.6);cyl(p,.29,.02,mat('#9e6936'),-1,1.52,-d/2+.6);
+      for(const x of [-1.2,1.1]){table(p,x,1.0,.85,.65,.74);stool(p,x,1.65,'#79654d');cyl(p,.19,.075,cream,x,.82,1.0);cyl(p,.16,.012,mat(kind==='mianpi'?'#d2ad71':'#b0854f'),x,.865,1.0);}
+      for(let i=0;i<4;i++)bottle(p,-.1+i*.3,1.05,-d/2+.62,i,.8,'care');
+    }
+  }
+  return {furnish,preview,architecture,stall,basket,bottle,soft};
 }
