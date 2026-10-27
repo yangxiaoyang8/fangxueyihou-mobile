@@ -35,7 +35,7 @@
         <div class="device-list"><label class="device"><span class="device-icon street">⌁</span><span><b>街道路灯</b><small>街区公共照明</small></span><input type="checkbox" id="streetToggle" checked><i class="mini-switch"></i></label></div>
         <div class="newsstand-jumps"><button class="newsstand-jump" id="newsstandBtn">▤ 报刊亭正面</button><button class="newsstand-jump" id="newsstandSideBtn">▤ 侧架：时尚与奥秘</button><button class="newsstand-jump" id="soupStallBtn">♨ 麻辣烫摊近看</button><button class="newsstand-jump" id="friedStallBtn">♨ 炸串摊近看</button></div>
         <div class="segmented" id="viewCtrl"><button data-value="front">到店门口</button><button data-value="near">近看细节</button><button data-value="above">俯看布局</button><button data-value="next">下一家</button></div>
-        <div class="panel-footer"><p id="status">原型范围：街区总览 + 两组可进入店铺</p></div>
+        <div class="panel-footer"><p id="status">9 家可进入店铺 · 街口小摊与报刊亭</p><small id="textureLoadStatus" role="status" aria-live="polite">正在加载店铺素材…</small><button id="retryTextures" class="reset" type="button" hidden>重新加载缺失素材</button></div>
       </section>
       </div>
       <div class="mobile-control-view" id="mobileShopView" data-mobile-view="shop" role="tabpanel" aria-labelledby="mobileTabShop">
@@ -74,6 +74,6 @@
   </main>
   <script src="startup-guard.js?v=2-mobile-diagnostics"></script>
   <script src="mobile-controls.js?v=4" defer></script>
-  <script type="module" src="scene-v2.js?v=101-mobile-startup-repair"></script>
+  <script type="module" src="scene-v2.js?v=102-shared-textures"></script>
 </body>
 </html>

@@ -1,11 +1,11 @@
-import {texturePath} from './texture-format.js';
+import {texturePath,loadTextureImage,createTextureLoader,textureStatus,retryTextures} from './texture-format.js?v=102-shared-textures';
 import * as T from './vendor/three.module.js';
 import {OrbitControls} from './vendor/addons/controls/OrbitControls.js';
 import {GLTFLoader} from './vendor/addons/loaders/GLTFLoader.js';
 import {mergeGeometries} from './vendor/BufferGeometryUtils.js';
 import {RoundedBoxGeometry} from './vendor/RoundedBoxGeometry.js';
-import {createDistrictKit} from './district-details.js?v=93-texture-format-fallback';
-import {addPeriodPrints,addPhotographicGoods,shopSignTexture,applyAuthorizedPosters} from './shop-visuals.js?v=93-texture-format-fallback';
+import {createDistrictKit} from './district-details.js?v=102-shared-textures';
+import {addPeriodPrints,addPhotographicGoods,shopSignTexture,applyAuthorizedPosters} from './shop-visuals.js?v=102-shared-textures';
 import {lightingAt} from './environment-cycle.js';
 import {weatherSurface} from './weather-surfaces.js';
 import {createSoundscape} from './soundscape.js';
@@ -18,7 +18,28 @@ import {RoomEnvironment} from './vendor/addons/environments/RoomEnvironment.js';
 // Geometry and textures are built separately. Each store has independent
 // front, roof, shell and furniture groups, so a cutaway cannot leave a lintel behind.
 const canvas=document.querySelector('#scene');
+function updateTextureStatus(){
+  const status=textureStatus(),label=document.querySelector('#textureLoadStatus'),retry=document.querySelector('#retryTextures');
+  if(label)label.textContent=status.failed.length?'有 '+status.failed.length+' 张素材加载失败':status.pending?'店铺素材 '+status.ready+' / '+status.total:'店铺素材已就绪';
+  if(retry)retry.hidden=!status.failed.length;
+}
+window.addEventListener('scene-textures',updateTextureStatus);
+document.querySelector('#retryTextures')?.addEventListener('click',retryTextures);
+updateTextureStatus();
 const mobileDevice=matchMedia('(max-width:680px), (pointer:coarse)').matches;
+function mobileTextureBudget(root){
+  if(!mobileDevice)return;
+  const visited=new Set();
+  root.traverse(object=>{for(const material of Array.isArray(object.material)?object.material:[object.material]){
+    if(!material)continue;
+    for(const texture of Object.values(material))if(texture?.isTexture&&!texture.isRenderTargetTexture&&!visited.has(texture)){
+      visited.add(texture);
+      if(texture.generateMipmaps||texture.minFilter!==T.LinearFilter||texture.anisotropy>2){
+        texture.generateMipmaps=false;texture.minFilter=T.LinearFilter;texture.anisotropy=Math.min(2,texture.anisotropy);texture.needsUpdate=true;
+      }
+    }
+  }});
+}
 const renderer=new T.WebGLRenderer({canvas,antialias:!mobileDevice,preserveDrawingBuffer:true,powerPreference:mobileDevice?'low-power':'high-performance',failIfMajorPerformanceCaveat:false});
 // Mobile Safari renders the canvas at the backing-store resolution. Keep the
 // Retina buffer sharper than the old 1.25 cap, while limiting GPU use on phones.
@@ -63,7 +84,7 @@ function rod(p,a,b,r=.025,m=iron){const start=new T.Vector3(...a),end=new T.Vect
 function cable(p,pts,r=.012,m=iron){return mesh(p,new T.TubeGeometry(new T.CatmullRomCurve3(pts.map(a=>new T.Vector3(...a))),24,r,5,false),m);}
 function texture(draw,size=512){const c=document.createElement('canvas');c.width=c.height=size;draw(c.getContext('2d'),size);const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;t.anisotropy=8;return t;}
 function tiled(t,repeat=1){t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(repeat,repeat);return t;}
-const pbrLoader=new T.TextureLoader();
+const pbrLoader=createTextureLoader();
 const fasciaTextures={
   fashion:pbrLoader.load(texturePath('./textures/fast/fashion-fascia-original-3to1-v3.webp')),
   bakery:pbrLoader.load(texturePath('./textures/fast/bakery-fascia-3to1-v1.webp')),
@@ -87,14 +108,14 @@ const roadMap=tiled(texture((c,s)=>{c.fillStyle='#4c4b53';c.fillRect(0,0,s,s);fo
 const asphalt=new T.MeshStandardMaterial({map:pbrMap('Asphalt010','Color'),normalMap:pbrMap('Asphalt010','NormalGL'),roughnessMap:pbrMap('Asphalt010','Roughness'),roughness:.95,normalScale:new T.Vector2(.65,.65)});
 for(const t of [asphalt.map,asphalt.normalMap,asphalt.roughnessMap])t.repeat.set(.25,.25);
 timber.userData.metersPerTile=2;
-const tileMap=new T.TextureLoader().load(texturePath('./textures/fast/terrazzo_floor.webp'));tileMap.colorSpace=T.SRGBColorSpace;tileMap.anisotropy=8;
+const tileMap=createTextureLoader().load(texturePath('./textures/fast/terrazzo_floor.webp'));tileMap.colorSpace=T.SRGBColorSpace;tileMap.anisotropy=8;
 const floorMat=new T.MeshStandardMaterial({map:tileMap,roughness:.65,bumpMap:tileMap,bumpScale:.008});floorMat.userData.metersPerTile=2;tiled(tileMap);
 const pavement=plaster('#b0a58f');
 pavement.userData.metersPerTile=2;
 weatherMaterials.push(weatherSurface(asphalt,.42),weatherSurface(pavement,.9));
 const brickFinish=new T.MeshStandardMaterial({map:pbrMap('Bricks051','Color'),normalMap:pbrMap('Bricks051','NormalGL'),roughnessMap:pbrMap('Bricks051','Roughness'),roughness:.92,normalScale:new T.Vector2(.7,.7)});brickFinish.userData.metersPerTile=2;
 const covers=Array.from({length:16},()=>new T.MeshStandardMaterial({color:'#b9a98b',roughness:.8,side:T.DoubleSide}));
-new T.TextureLoader().load(texturePath('./textures/fast/rental-books-atlas-v1.webp'),atlas=>{covers.forEach((material,i)=>{const tile=atlas.clone();tile.colorSpace=T.SRGBColorSpace;tile.repeat.set(.244,.244);tile.offset.set((i%4)*.25+.003,(3-Math.floor(i/4))*.25+.003);tile.anisotropy=8;tile.needsUpdate=true;material.map=tile;material.color.set('#ffffff');material.needsUpdate=true;});});
+createTextureLoader().load(texturePath('./textures/fast/rental-books-atlas-v1.webp'),atlas=>{covers.forEach((material,i)=>{const tile=atlas.clone();tile.colorSpace=T.SRGBColorSpace;tile.repeat.set(.244,.244);tile.offset.set((i%4)*.25+.003,(3-Math.floor(i/4))*.25+.003);tile.anisotropy=8;tile.needsUpdate=true;material.map=tile;material.color.set('#ffffff');material.needsUpdate=true;});});
 const bookPalette=['#975f50','#536a74','#987c57','#7b586d','#6b806f','#a86458','#59647b','#a28562'];
 const bookNames=['青春漫记','校园物语','少年侦探','旧城来信','武侠故事','仲夏日记','漫画精选','星空旅人','街角书屋','放学以后','奇妙旅程','年少时光','午夜电台','橘色黄昏','春日书简','纸上冒险'];
 const paperEdgeMap=texture((c,s)=>{c.fillStyle='#ddd1b7';c.fillRect(0,0,s,s);for(let y=0;y<s;y+=3){c.fillStyle=y%9?'#f7f0da8b':'#9d8d7059';c.fillRect(0,y,s,1);}},256);
@@ -105,7 +126,7 @@ function label(p,text,w,h,bg='#d5b568',fg='#4c3022',size=70){const c=document.cr
 function book(p,x,y,z,i,face=false){const h=.25+rand()*.12,w=face?.25:.055+rand()*.026,d=face?.032:.2,g=group(p,x,y,z);const materials=face?[bookSpines[i%16],bookSpines[i%16],paperEdge,paperEdge,covers[i%16],bookBacks[i%16]]:[covers[i%16],bookBacks[i%16],paperEdge,paperEdge,bookSpines[i%16],bookSpines[i%16]];box(g,w,h,d,materials,0,h/2,0);return g;}
 let bookcasePhoto=null;const bookcaseRows=[];
 function setBookcaseRow(material,row){if(!bookcasePhoto)return;const crop=bookcasePhoto.clone();crop.colorSpace=T.SRGBColorSpace;crop.repeat.set(1,1/6);crop.offset.y=row/6;crop.anisotropy=8;crop.needsUpdate=true;material.map=crop;material.color.set('#ffffff');material.needsUpdate=true;}
-new T.TextureLoader().load(texturePath('./textures/fast/rental-bookcase-face-v1.webp'),loaded=>{bookcasePhoto=loaded;for(const [material,row] of bookcaseRows)setBookcaseRow(material,row);});
+createTextureLoader().load(texturePath('./textures/fast/rental-bookcase-face-v1.webp'),loaded=>{bookcasePhoto=loaded;for(const [material,row] of bookcaseRows)setBookcaseRow(material,row);});
 function bookshelf(p,width=2.2,photo=false){const g=group(p);box(g,width,2.35,.12,timber,0,1.2,-.19);for(const x of [-width/2,width/2])box(g,.08,2.45,.44,timber,x,1.22,0);for(let row=0;row<5;row++){const y=.16+row*.46;box(g,width,.055,.48,timber,0,y,0);if(photo){const backdrop=new T.MeshStandardMaterial({color:'#b9a98b',roughness:.9});bookcaseRows.push([backdrop,row]);setBookcaseRow(backdrop,row);mesh(g,new T.PlaneGeometry(width-.13,.37),backdrop,0,y+.24,.105).castShadow=false;}else{let x=-width/2+.1;let i=0;while(x<width/2-.16){const face=i%4===0;book(g,x,y+.03,.03,(row*5+i)%16,face);x+=face?.3:.105;i++;}}}box(g,width+.1,.1,.5,timber,0,2.43,0);return g;}
 function stool(p,x,z,color='#ba5139',y=0){const g=group(p,x,y,z);box(g,.38,.08,.36,mat(color),0,.46,0);for(const dx of [-.13,.13])for(const dz of [-.12,.12]){rod(g,[dx,.44,dz],[dx*1.25,.02,dz*1.25],.035,mat(color));}box(g,.32,.04,.04,mat(color),0,.2,.15);box(g,.32,.04,.04,mat(color),0,.2,-.15);return g;}
 function chair(p,x,z,angle=0){const g=group(p,x,0,z,angle);box(g,.47,.09,.45,mat('#495d69'),0,.49,0);for(const a of [-.18,.18])for(const b of [-.17,.17])rod(g,[a,.02,b],[a,.49,b],.024,iron);box(g,.45,.48,.075,mat('#465a64'),0,.84,.19);rod(g,[-.18,.48,.2],[-.18,1.03,.2],.025);rod(g,[.18,.48,.2],[.18,1.03,.2],.025);return g;}
@@ -347,7 +368,7 @@ initializeBarberMirrors();
 let barberMirrorCaptured=false;
 const interiorLoader=new GLTFLoader();
 function enrichInterior(model){const changed=new Map();model.traverse(o=>{if(!o.isMesh||Array.isArray(o.material))return;const original=o.material,name=original.name||'';if(!changed.has(original.uuid)){const m=original.clone();if(/钢|铝|黑铁/.test(name)){Object.assign(m,metalPBR);m.normalScale.set(.22,.22);}else if(/木/.test(name)){Object.assign(m,woodPBR);m.color.set('#c9b08a');m.userData.metersPerTile=2;}else if(/瓷砖/.test(name)){m.map=ceramic.map;m.normalMap=ceramic.normalMap;m.roughnessMap=ceramic.roughnessMap;m.normalScale.set(.35,.35);m.userData.metersPerTile=1.8;}changed.set(original.uuid,m);}o.material=changed.get(original.uuid);if(o.material.userData.metersPerTile){o.geometry=o.geometry.clone();const pos=o.geometry.attributes.position,n=o.geometry.attributes.normal,uv=o.geometry.attributes.uv,s=o.material.userData.metersPerTile;if(uv)for(let i=0;i<pos.count;i++){const nx=Math.abs(n.getX(i)),ny=Math.abs(n.getY(i));uv.setXY(i,(nx>.5?pos.getZ(i)*o.scale.z:pos.getX(i)*o.scale.x)/s,(ny>.5?pos.getZ(i)*o.scale.z:pos.getY(i)*o.scale.y)/s);}}});}
-function loadShopInterior(id,file){const house=stores.get(id);if(!house||house.interiorModelRequested)return;house.interiorModelRequested=true;interiorLoader.load('./blender_assets/'+file+'?v=48-shop-details',gltf=>{const model=gltf.scene;enrichInterior(model);model.rotation.y=Math.PI;model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});house.floors[0].inside.add(model);batch(model);atmosphere();document.querySelector('#scene').dataset[id+'Model']='ready';},undefined,error=>{console.error('店铺模型加载失败',id,error);toast(house.name+'设备加载失败，请刷新重试');});}
+function loadShopInterior(id,file){const house=stores.get(id);if(!house||house.interiorModelRequested)return;house.interiorModelRequested=true;interiorLoader.load('./blender_assets/'+file+'?v=48-shop-details',gltf=>{const model=gltf.scene;enrichInterior(model);model.rotation.y=Math.PI;model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});house.floors[0].inside.add(model);mobileTextureBudget(model);batch(model);atmosphere();document.querySelector('#scene').dataset[id+'Model']='ready';},undefined,error=>{console.error('店铺模型加载失败',id,error);toast(house.name+'设备加载失败，请刷新重试');});}
 if(!mobileDevice){loadShopInterior('tea','seven_cups_tea_v2.glb');loadShopInterior('noodles','xiaoling_noodles.glb');}
 
 function streetLamp(x,z){const g=group(world,x,0,z,x>0?Math.PI:0);cyl(g,.075,4.1,iron,0,2.05,0,.12);cyl(g,.16,.3,iron,0,.15,0);cable(g,[[0,3.5,0],[0,4.25,0],[.55,4.25,0],[.65,3.95,0]],.04);fixture(g,.65,3.94,0,'#ffd18d',16,'street');}
@@ -378,11 +399,11 @@ const newsTitles=[
   ['奥秘','探索未知',1,4,'#386b5d'],['中国时装','Harper’s BAZAAR',1,5,'#7e3d42'],
   ['ELLE','世界时装之苑',1,3,'#2d3337'],['时尚芭莎','Harper’s BAZAAR',1,5,'#843d47']
 ];
-const newsArt=[new Image(),new Image()],newsCoverRefresh=[];
+const newsArt=['literature','culture'].map(kind=>loadTextureImage('./textures/fast/newsstand-'+kind+'-art-atlas.webp')),newsCoverRefresh=[];
 function newsCover(i){const [title,subtitle,source,cell,accent]=newsTitles[i],c=document.createElement('canvas');c.width=384;c.height=560;const ctx=c.getContext('2d'),tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;tex.anisotropy=8;
   const draw=()=>{ctx.fillStyle='#e8dfcb';ctx.fillRect(0,0,384,560);const img=newsArt[source];if(img.complete&&img.naturalWidth){const cw=img.width/3,ch=img.height/2,cx=(cell%3)*cw,cy=Math.floor(cell/3)*ch;ctx.drawImage(img,cx+3,cy+20,cw-6,Math.min(ch-34,520),0,0,384,560);}ctx.fillStyle=accent;ctx.fillRect(0,0,384,106);ctx.fillStyle='#f5efdb';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=(title.length>4?'bold 56px':'bold 72px')+' "Songti SC","PingFang SC",serif';ctx.fillText(title,192,51,368);ctx.font='bold 22px "PingFang SC",sans-serif';ctx.fillText(subtitle,192,90,364);ctx.fillStyle='rgba(20,22,24,.68)';ctx.fillRect(0,516,384,44);ctx.textAlign='left';ctx.fillStyle='#fff1d3';ctx.font='19px sans-serif';ctx.fillText(i===11?'2003 · 08':'2005 · '+String(3+i%5).padStart(2,'0'),14,544);ctx.textAlign='right';ctx.fillText('放学后的阅读',372,544);ctx.strokeStyle='rgba(255,248,224,.65)';ctx.lineWidth=3;ctx.strokeRect(5,5,374,550);tex.needsUpdate=true;};
   newsCoverRefresh.push(draw);draw();return new T.MeshStandardMaterial({map:tex,roughness:.9,side:T.DoubleSide});}
-const newsCovers=newsTitles.map((_,i)=>newsCover(i));newsArt.forEach((img,i)=>{img.onload=()=>newsCoverRefresh.forEach(draw=>draw());img.src=texturePath('./textures/fast/newsstand-'+(i?'culture':'literature')+'-art-atlas.webp');});
+const newsCovers=newsTitles.map((_,i)=>newsCover(i));newsArt.forEach(img=>img.addEventListener('load',()=>newsCoverRefresh.forEach(draw=>draw())));
 function newsReverse(i,spine=false){const [title,subtitle,,,accent]=newsTitles[i],c=document.createElement('canvas');c.width=spine?128:384;c.height=560;const q=c.getContext('2d');q.fillStyle=accent;q.fillRect(0,0,c.width,c.height);q.fillStyle='#e7dece';q.fillRect(10,13,c.width-20,c.height-26);q.fillStyle=accent;if(spine){q.fillRect(10,13,c.width-20,70);q.save();q.translate(67,515);q.rotate(-Math.PI/2);q.font='bold 42px "Songti SC",serif';q.textAlign='center';q.fillText(title,245,0,430);q.restore();}else{q.textAlign='center';q.font='bold 36px "Songti SC",serif';q.fillText(title,192,74,345);q.font='22px "Songti SC",serif';q.fillText(subtitle,192,111,340);q.textAlign='left';for(let n=0;n<12;n++){q.fillStyle=n%3?'#887f708f':'#b7aa96';q.fillRect(35,160+n*22,306-(n%4)*31,4);}q.fillStyle='#faf4e8';q.fillRect(215,425,128,78);for(let b=0;b<35;b++){q.fillStyle='#2b2927';q.fillRect(226+b*3,433,b%5===0?3:1,48-(b%4)*3);}q.font='18px sans-serif';q.fillStyle=accent;q.fillText('2005 · 街边读物',35,518);}
   const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;tex.anisotropy=8;return new T.MeshStandardMaterial({map:tex,roughness:.89});}
 const newsBacks=newsTitles.map((_,i)=>newsReverse(i)),newsSpines=newsTitles.map((_,i)=>newsReverse(i,true));
@@ -490,7 +511,7 @@ let streetMode=false;
 function hideWalkControls(){walkKeys.clear();document.querySelector('#viewCtrl [data-value="front"]').textContent='到店门口';controls.enabled=true;camera.fov=39;camera.updateProjectionMatrix();document.querySelector('#walkCtrl').hidden=true;document.querySelector('#lookCtrl').hidden=true;}
 function exterior(){streetMode=false;state.open=false;state.store=null;state.floor=0;hideWalkControls();controls.minDistance=13;controls.maxDistance=70;controls.maxPolarAngle=1.45;syncVisibility();setCamera(new T.Vector3(8,34,50),new T.Vector3(0,2,3.0));document.querySelector('#sceneName').textContent='放学后的校门口';document.querySelector('#sceneEyebrow').textContent='2005 · '+lightingAt(state.time,state.weather).label;document.querySelector('#sceneCaption').textContent='拖动旋转 · 滚轮缩放 · 点击店铺';syncUI();}
 function focusStorefront(id){const s=stores.get(id);if(!s)return;streetMode=false;state.open=false;state.store=id;state.floor=0;hideWalkControls();controls.minDistance=1.7;controls.maxDistance=45;controls.maxPolarAngle=1.48;syncVisibility();const target=new T.Vector3(0,1.65,s.d/2+.15),pos=new T.Vector3(.3,4.1,s.d/2+6);s.root.updateMatrixWorld(true);s.root.localToWorld(target);s.root.localToWorld(pos);setCamera(pos,target);document.querySelector('#sceneName').textContent=s.name.replace('☆ ','');document.querySelector('#sceneEyebrow').textContent='店前街景 · 可沿人行道靠近';document.querySelector('#sceneCaption').textContent='拖动看店门 · 点击「一层」进入室内';syncUI();}
-function enter(id,level=0){const s=stores.get(id);if(!s)return;streetMode=false;state.store=id;state.floor=Math.min(level,s.levels-1);if(mobileDevice){const selectedFloor=s.floors[state.floor];if(!selectedFloor.insideBuilt){buildInteriorDetails(selectedFloor.inside,s,state.floor);selectedFloor.insideBuilt=true;if(id==='barber'&&state.floor===0)initializeBarberMirrors();atmosphere();}if(!selectedFloor.insideBatched){batch(selectedFloor.inside);selectedFloor.insideBatched=true;}}if(mobileDevice&&id==='tea')loadShopInterior(id,'seven_cups_tea_v2.glb');if(mobileDevice&&id==='noodles')loadShopInterior(id,'xiaoling_noodles.glb');state.open=true;hideWalkControls();controls.minDistance=3;controls.maxDistance=25;controls.maxPolarAngle=1.46;syncVisibility();const y=state.floor*3.3;const position=new T.Vector3(.7,y+4.6,s.d/2+6.3);const target=new T.Vector3(0,y+1.35,-.2);s.root.updateMatrixWorld(true);s.root.localToWorld(position);s.root.localToWorld(target);setCamera(position,target);document.querySelector('#sceneName').textContent=s.name.replace('☆ ','');document.querySelector('#sceneEyebrow').textContent='临街立面展开 · '+(level?'二层':'一层');document.querySelector('#sceneCaption').textContent='墙面、门窗、雨棚、屋顶已移开 · 点击屏幕换台';syncUI();soundscape.playEffect('door');}
+function enter(id,level=0){const s=stores.get(id);if(!s)return;streetMode=false;state.store=id;state.floor=Math.min(level,s.levels-1);if(mobileDevice){const selectedFloor=s.floors[state.floor];if(!selectedFloor.insideBuilt){buildInteriorDetails(selectedFloor.inside,s,state.floor);selectedFloor.insideBuilt=true;mobileTextureBudget(selectedFloor.inside);if(id==='barber'&&state.floor===0)initializeBarberMirrors();atmosphere();}if(!selectedFloor.insideBatched){batch(selectedFloor.inside);selectedFloor.insideBatched=true;}}if(mobileDevice&&id==='tea')loadShopInterior(id,'seven_cups_tea_v2.glb');if(mobileDevice&&id==='noodles')loadShopInterior(id,'xiaoling_noodles.glb');state.open=true;hideWalkControls();controls.minDistance=3;controls.maxDistance=25;controls.maxPolarAngle=1.46;syncVisibility();const y=state.floor*3.3;const position=new T.Vector3(.7,y+4.6,s.d/2+6.3);const target=new T.Vector3(0,y+1.35,-.2);s.root.updateMatrixWorld(true);s.root.localToWorld(position);s.root.localToWorld(target);setCamera(position,target);document.querySelector('#sceneName').textContent=s.name.replace('☆ ','');document.querySelector('#sceneEyebrow').textContent='临街立面展开 · '+(level?'二层':'一层');document.querySelector('#sceneCaption').textContent='墙面、门窗、雨棚、屋顶已移开 · 点击屏幕换台';syncUI();soundscape.playEffect('door');}
 function focusNewsstand(){exterior();controls.minDistance=1.3;controls.maxDistance=35;newsstand.updateWorldMatrix(true,false);setCamera(newsstand.localToWorld(new T.Vector3(.5,2.5,5)),newsstand.localToWorld(new T.Vector3(0,1.5,.5)));document.querySelector('#sceneName').textContent='街口报刊亭';document.querySelector('#sceneEyebrow').textContent='2003–2005 · 街边报刊';document.querySelector('#sceneCaption').textContent='街口买一本杂志，再慢慢走向学校';}
 function focusNewsstandSide(){exterior();controls.minDistance=1.3;controls.maxDistance=35;newsstand.updateWorldMatrix(true,false);setCamera(newsstand.localToWorld(new T.Vector3(-5,2.3,1)),newsstand.localToWorld(new T.Vector3(-1.2,1.5,0)));document.querySelector('#sceneName').textContent='报刊亭侧架';document.querySelector('#sceneEyebrow').textContent='2003–2005 · 杂志侧架';document.querySelector('#sceneCaption').textContent='青年视觉 · 奥秘 · ELLE · 中国时装 / 时尚芭莎';}
 function focusStall(stall,title){exterior();controls.minDistance=1.1;controls.maxDistance=25;stall.updateWorldMatrix(true,false);setCamera(stall.localToWorld(new T.Vector3(1.25,2.25,3.6)),stall.localToWorld(new T.Vector3(0,1.16,0)));document.querySelector('#sceneName').textContent=title;document.querySelector('#sceneEyebrow').textContent='街边小摊 · 近看食材';document.querySelector('#sceneCaption').textContent='拖动旋转 · 观察托盘与独立食材模型';}
@@ -553,7 +574,7 @@ document.querySelector('#recordBtn').onclick=()=>{
   document.querySelector('#recordLabel').textContent='停止';document.querySelector('#recordBtn').classList.add('recording');
 };
 for(const id of ['closeHelp','gotIt'])document.querySelector('#'+id).onclick=()=>document.querySelector('#helpModal').classList.add('hidden');document.querySelector('#helpBtn').onclick=()=>document.querySelector('#helpModal').classList.remove('hidden');
-const gameStill=new Image(),tvStill=new Image();gameStill.src=texturePath('./textures/fast/fictional-cyber-screens-v1.webp');tvStill.src=texturePath('./textures/fast/fictional-tv-stills-v1.webp');
+const gameStill=loadTextureImage('./textures/fast/fictional-cyber-screens-v1.webp'),tvStill=loadTextureImage('./textures/fast/fictional-tv-stills-v1.webp');
 const customScreens={tv:[],game:[]},customUrls={tv:[],game:[]};
 const videoMimeByExtension={mp4:'video/mp4',m4v:'video/mp4',mov:'video/quicktime',webm:'video/webm',ogv:'video/ogg'};
 const imageExtensions=/\.(avif|bmp|gif|jpe?g|png|webp)$/i;
@@ -637,6 +658,6 @@ function render(now){
 }
 function resize(){const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);if(!mobileDevice)composer.setSize(r.width,r.height);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
 if('ResizeObserver' in window)new ResizeObserver(resize).observe(canvas);else window.addEventListener('resize',resize,{passive:true});
-resize();season();atmosphere();exterior();document.querySelector('#loading').remove();document.querySelector('#status').textContent='9 家可进入店铺 · 麻辣烫 / 炸串摊';requestAnimationFrame(render);
+mobileTextureBudget(scene);resize();season();atmosphere();exterior();document.querySelector('#loading').remove();document.querySelector('#status').textContent='9 家可进入店铺 · 麻辣烫 / 炸串摊';requestAnimationFrame(render);
 // Read-only diagnostics used to verify the actual scene graph and renderer.
-window.sceneQA=()=>({state:{...state},audio:soundscape.debugState(),stores:[...stores.values()].map(s=>({id:s.id,visible:s.root.visible,levels:s.floors.map(f=>({visible:f.floor.visible,front:f.front.visible,roof:f.roof.visible}))})),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,screenCount:screens.length,roomLights:lamps.filter(l=>l.type==='room').length,canvas:[canvas.width,canvas.height]});
+window.sceneQA=()=>({textures:textureStatus(),contextLost:renderer.getContext().isContextLost(),gpuTextures:renderer.info.memory.textures,state:{...state},audio:soundscape.debugState(),stores:[...stores.values()].map(s=>({id:s.id,visible:s.root.visible,levels:s.floors.map(f=>({visible:f.floor.visible,front:f.front.visible,roof:f.roof.visible}))})),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,screenCount:screens.length,roomLights:lamps.filter(l=>l.type==='room').length,canvas:[canvas.width,canvas.height]});
