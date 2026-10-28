@@ -479,6 +479,8 @@ export function createDistrictKit(a){
       for(const x of [-1.2,1.1]){table(p,x,1.0,.85,.65,.74);stool(p,x,1.65,'#79654d');cyl(p,.19,.075,cream,x,.82,1.0);cyl(p,.16,.012,mat(kind==='mianpi'?'#d2ad71':'#b0854f'),x,.865,1.0);}
       for(let i=0;i<4;i++)bottle(p,-.1+i*.3,1.05,-d/2+.62,i,.8,'care');
     }
+    const lit=new Map();
+    p.traverse(o=>{if(!o.isMesh)return;const lift=m=>{if(!m?.isMeshStandardMaterial||!m.map)return m;if(!lit.has(m)){const copy=m.clone();copy.emissive.copy(copy.color).multiplyScalar(.12);if(copy.map)copy.emissiveMap=copy.map;lit.set(m,copy);}return lit.get(m);};o.material=Array.isArray(o.material)?o.material.map(lift):lift(o.material);});
   }
   return {furnish,preview,architecture,stall,basket,bottle,soft};
 }

@@ -8,10 +8,11 @@ const later=callback=>Promise.resolve().then(callback);
 
 // Export support does not tell us whether a browser can decode WebP.
 // Try the actual image, then its JPEG/PNG counterpart if decoding fails.
-export function texturePath(url){return url;}
+export function texturePath(url){return mobileTextures?url.replace('/textures/fast/','/textures/mobile/'):url;}
 
 function fallbackURL(url){
   const next=new URL(url,document.baseURI);
+  if(next.pathname.includes('/textures/mobile/'))return next.href.replace('/textures/mobile/','/textures/fast/');
   if(!next.pathname.includes('/textures/fast/')||!next.pathname.endsWith('.webp'))return null;
   const name=next.pathname.split('/').pop().replace(/\.webp$/,'');
   next.pathname=next.pathname.replace('/textures/fast/','/textures/').replace(/\.webp$/,pngAssets.has(name)?'.png':'.jpg');
@@ -37,13 +38,14 @@ function imageAttempt(url){
 }
 
 async function decode(entry){
-  const alternatives=[entry.url,fallbackURL(entry.url)].filter(Boolean);
+  const fallback=fallbackURL(entry.url);
+  const alternatives=[entry.url,fallback,fallback&&fallbackURL(fallback)].filter((v,i,a)=>v&&a.indexOf(v)===i);
   let lastError;
   for(let i=0;i<alternatives.length;i++){
     let image;
     try{
       image=await imageAttempt(alternatives[i]);
-      const limit=mobileTextures?(entry.url.includes('/pbr/')?512:entry.url.includes('fascia')?1024:768):2048;
+      const limit=mobileTextures?(entry.url.includes('/pbr/')?512:/atlas|fascia|bookcase/.test(entry.url)?1536:1024):2048;
       const scale=Math.min(1,limit/Math.max(image.naturalWidth,image.naturalHeight));
       entry.canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
       entry.canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
@@ -69,7 +71,7 @@ function pump(){
 }
 
 function entryFor(url){
-  const key=new URL(url,document.baseURI).href;
+  const key=new URL(texturePath(url),document.baseURI).href;
   if(entries.has(key))return entries.get(key);
   const canvas=document.createElement('canvas');canvas.width=canvas.height=1;
   canvas.complete=false;canvas.naturalWidth=canvas.naturalHeight=0;

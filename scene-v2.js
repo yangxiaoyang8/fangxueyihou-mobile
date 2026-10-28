@@ -44,10 +44,10 @@ function mobileTextureBudget(root){
     }
   }});
 }
-const renderer=new T.WebGLRenderer({canvas,antialias:!mobileDevice,preserveDrawingBuffer:true,powerPreference:mobileDevice?'low-power':'high-performance',failIfMajorPerformanceCaveat:false});
+const renderer=new T.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true,powerPreference:mobileDevice?'low-power':'high-performance',failIfMajorPerformanceCaveat:false});
 // Mobile Safari renders the canvas at the backing-store resolution. Keep the
 // Retina buffer sharper than the old 1.25 cap, while limiting GPU use on phones.
-renderer.setPixelRatio(Math.min(devicePixelRatio,mobileDevice?1.35:1.75));
+renderer.setPixelRatio(Math.min(devicePixelRatio,mobileDevice?1.65:1.75));
 renderer.outputColorSpace=T.SRGBColorSpace;
 renderer.toneMapping=T.ACESFilmicToneMapping;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;
@@ -510,12 +510,12 @@ const visited=new Set();scene.traverse(o=>{if(!o.isMesh)return;for(const m of Ar
 }
 function season(){const cols={spring:['#587748','#77905b','#8d9b61'],summer:['#3f6547','#547447','#6b814f'],autumn:['#a8733e','#b3904c','#9c5e3c'],winter:['#718077','#89928a','#a0a99e']}[state.season];foliageBatches.forEach((o,i)=>{o.material.color.set(cols[i%3]);o.visible=state.season!=='winter'||!o.userData.deciduous;});syncDressing();document.querySelector('#seasonValue').textContent=({spring:'春 · 新芽',summer:'夏 · 浓荫',autumn:'秋 · 金叶',winter:'冬 · 枝寒'})[state.season];syncSoundscape();}
 const environmentObjects=world.children.filter(o=>!o.userData.id&&o!==base&&o!==ground);
-function syncVisibility(){base.visible=ground.visible=shadowFloor.visible=!state.open;for(const o of environmentObjects)o.visible=!state.open;for(const s of stores.values()){const selected=s.id===state.store;s.root.visible=!state.open||selected;s.outside.visible=!state.open;for(let i=0;i<s.floors.length;i++){const f=s.floors[i];f.floor.visible=!state.open||i===state.floor;f.front.visible=!state.open;f.roof.visible=!state.open;if(mobileDevice){f.inside.visible=state.open;if(f.preview)f.preview.visible=!state.open;}}}for(const m of barberMirrors)m.visible=state.open&&state.store==='barber'&&state.floor===0;if(barberStudent){barberStudent.visible=false;barberStudent.material.opacity=0;}barberMirrorCaptured=false;for(const l of lamps){let visible=true,p=l.light;while(p){if(!p.visible){visible=false;break;}p=p.parent;}l.light.castShadow=state.open&&visible&&l.type==='room';if(l.light.castShadow){l.light.shadow.mapSize.set(512,512);l.light.shadow.bias=-.001;l.light.shadow.normalBias=.025;}}precipitation.visible=state.weather==='snow'&&!state.open;syncDressing();syncSoundscape();}
+function syncVisibility(){base.visible=ground.visible=shadowFloor.visible=!state.open;for(const o of environmentObjects)o.visible=!state.open;for(const s of stores.values()){const selected=s.id===state.store;s.root.visible=!state.open||selected;s.outside.visible=!state.open;for(let i=0;i<s.floors.length;i++){const f=s.floors[i];f.floor.visible=!state.open||i===state.floor;f.front.visible=!state.open;f.roof.visible=!state.open;if(mobileDevice){f.inside.visible=state.open||Boolean(f.streetDetailed);if(f.preview)f.preview.visible=!state.open&&!f.streetDetailed;}}}for(const m of barberMirrors)m.visible=state.open&&state.store==='barber'&&state.floor===0;if(barberStudent){barberStudent.visible=false;barberStudent.material.opacity=0;}barberMirrorCaptured=false;for(const l of lamps){let visible=true,p=l.light;while(p){if(!p.visible){visible=false;break;}p=p.parent;}l.light.castShadow=state.open&&visible&&l.type==='room';if(l.light.castShadow){l.light.shadow.mapSize.set(512,512);l.light.shadow.bias=-.001;l.light.shadow.normalBias=.025;}}precipitation.visible=state.weather==='snow'&&!state.open;syncDressing();syncSoundscape();}
 function setCamera(pos,target){controls.enableDamping=false;camera.position.copy(pos);controls.target.copy(target);controls.update();controls.enableDamping=true;}
 let streetMode=false;
 function hideWalkControls(){walkKeys.clear();document.querySelector('#viewCtrl [data-value="front"]').textContent='到店门口';controls.enabled=true;camera.fov=39;camera.updateProjectionMatrix();document.querySelector('#walkCtrl').hidden=true;document.querySelector('#lookCtrl').hidden=true;}
 function exterior(){streetMode=false;state.open=false;state.store=null;state.floor=0;hideWalkControls();controls.minDistance=13;controls.maxDistance=70;controls.maxPolarAngle=1.45;syncVisibility();setCamera(new T.Vector3(8,34,50),new T.Vector3(0,2,3.0));document.querySelector('#sceneName').textContent='放学后的校门口';document.querySelector('#sceneEyebrow').textContent='2005 · '+lightingAt(state.time,state.weather).label;document.querySelector('#sceneCaption').textContent='拖动旋转 · 滚轮缩放 · 点击店铺';syncUI();}
-function focusStorefront(id){const s=stores.get(id);if(!s)return;streetMode=false;state.open=false;state.store=id;state.floor=0;hideWalkControls();controls.minDistance=1.7;controls.maxDistance=45;controls.maxPolarAngle=1.48;syncVisibility();const target=new T.Vector3(0,1.65,s.d/2+.15),pos=new T.Vector3(.3,4.1,s.d/2+6);s.root.updateMatrixWorld(true);s.root.localToWorld(target);s.root.localToWorld(pos);setCamera(pos,target);document.querySelector('#sceneName').textContent=s.name.replace('☆ ','');document.querySelector('#sceneEyebrow').textContent='店前街景 · 可沿人行道靠近';document.querySelector('#sceneCaption').textContent='拖动看店门 · 点击「一层」进入室内';syncUI();}
+function focusStorefront(id){const s=stores.get(id);if(!s)return;streetMode=false;state.open=false;state.store=id;state.floor=0;hideWalkControls();controls.minDistance=1.7;controls.maxDistance=45;controls.maxPolarAngle=1.48;syncVisibility();camera.fov=mobileDevice?55:44;camera.updateProjectionMatrix();const target=new T.Vector3(0,1.35,s.d/2-.6),pos=new T.Vector3(.3,2.3,s.d/2+7.6);s.root.updateMatrixWorld(true);s.root.localToWorld(target);s.root.localToWorld(pos);setCamera(pos,target);document.querySelector('#sceneName').textContent=s.name.replace('☆ ','');document.querySelector('#sceneEyebrow').textContent='店前街景 · 可沿人行道靠近';document.querySelector('#sceneCaption').textContent='拖动看店门 · 点击「一层」进入室内';syncUI();}
 function enter(id,level=0){const s=stores.get(id);if(!s)return;streetMode=false;state.store=id;state.floor=Math.min(level,s.levels-1);if(mobileDevice){const selectedFloor=s.floors[state.floor];if(!selectedFloor.insideBuilt){buildInteriorDetails(selectedFloor.inside,s,state.floor);selectedFloor.insideBuilt=true;mobileTextureBudget(selectedFloor.inside);if(id==='barber'&&state.floor===0)initializeBarberMirrors();atmosphere();}if(!selectedFloor.insideBatched){batch(selectedFloor.inside);selectedFloor.insideBatched=true;}}if(mobileDevice&&id==='tea')loadShopInterior(id,'seven_cups_tea_v2.glb');if(mobileDevice&&id==='noodles')loadShopInterior(id,'xiaoling_noodles.glb');state.open=true;hideWalkControls();controls.minDistance=3;controls.maxDistance=25;controls.maxPolarAngle=1.46;syncVisibility();const y=state.floor*3.3;const position=new T.Vector3(.7,y+4.6,s.d/2+6.3);const target=new T.Vector3(0,y+1.35,-.2);s.root.updateMatrixWorld(true);s.root.localToWorld(position);s.root.localToWorld(target);setCamera(position,target);document.querySelector('#sceneName').textContent=s.name.replace('☆ ','');document.querySelector('#sceneEyebrow').textContent='临街立面展开 · '+(level?'二层':'一层');document.querySelector('#sceneCaption').textContent='墙面、门窗、雨棚、屋顶已移开 · 点击屏幕换台';syncUI();soundscape.playEffect('door');}
 function focusNewsstand(){exterior();controls.minDistance=1.3;controls.maxDistance=35;newsstand.updateWorldMatrix(true,false);setCamera(newsstand.localToWorld(new T.Vector3(.5,2.5,5)),newsstand.localToWorld(new T.Vector3(0,1.5,.5)));document.querySelector('#sceneName').textContent='街口报刊亭';document.querySelector('#sceneEyebrow').textContent='2003–2005 · 街边报刊';document.querySelector('#sceneCaption').textContent='街口买一本杂志，再慢慢走向学校';}
 function focusNewsstandSide(){exterior();controls.minDistance=1.3;controls.maxDistance=35;newsstand.updateWorldMatrix(true,false);setCamera(newsstand.localToWorld(new T.Vector3(-5,2.3,1)),newsstand.localToWorld(new T.Vector3(-1.2,1.5,0)));document.querySelector('#sceneName').textContent='报刊亭侧架';document.querySelector('#sceneEyebrow').textContent='2003–2005 · 杂志侧架';document.querySelector('#sceneCaption').textContent='青年视觉 · 奥秘 · ELLE · 中国时装 / 时尚芭莎';}
@@ -643,11 +643,40 @@ function captureBarberMirrors(){
   for(const surface of barberMirrors)surface.visible=true;
   barberMirrorCaptured=true;
 }
+// Proximity, rather than a shop click, supplies the same detailed room outdoors.
+let streetDetailTick=0;
+function updateStreetInteriors(now){
+  if(!mobileDevice||state.open||now-streetDetailTick<350)return;
+  streetDetailTick=now;
+  let built=false,changed=false;
+  for(const shop of stores.values()){
+    const doorway=shop.root.localToWorld(new T.Vector3(0,1.5,shop.d/2));
+    const distance=camera.position.distanceTo(doorway);
+    for(let level=0;level<shop.floors.length;level++){
+      const floor=shop.floors[level];
+      const near=distance<(floor.streetDetailed?13:11)&&level===0;
+      if(near&&!floor.insideBuilt&&!built){
+        buildInteriorDetails(floor.inside,shop,level);floor.insideBuilt=true;
+        mobileTextureBudget(floor.inside);batch(floor.inside);floor.insideBatched=true;
+        if(shop.id==='barber')initializeBarberMirrors();
+        if(shop.id==='tea')loadShopInterior(shop.id,'seven_cups_tea_v2.glb');
+        if(shop.id==='noodles')loadShopInterior(shop.id,'xiaoling_noodles.glb');
+        built=true;
+      }
+      const detailed=near&&floor.insideBuilt;
+      if(Boolean(floor.streetDetailed)!==detailed){floor.streetDetailed=detailed;changed=true;}
+      floor.inside.visible=detailed;floor.preview.visible=!detailed;
+    }
+  }
+  if(built)atmosphere();
+  if(changed)syncVisibility();
+}
 let last=performance.now(),screenTick=0,firstFrame=false;
 function render(now){
   requestAnimationFrame(render);
   const elapsed=(now-last)/1000,dt=Math.min(.05,elapsed);last=now;
   if(streetMode)updateWalking(Math.min(1,elapsed));else controls.update();
+  updateStreetInteriors(now);
   if(barberMirror?.visible&&barberStudent){
     if(!barberMirrorCaptured)captureBarberMirrors();
     barberMirror.getWorldPosition(barberMirrorWorld);
@@ -660,13 +689,13 @@ function render(now){
   const movingTv=customScreens.tv.some(source=>source.tagName==='VIDEO'||source.dataset?.animated==='true');
   if(now-screenTick>(movingTv&&state.screens?40:250)){drawScreens(now);screenTick=now;}
   if(mobileDevice)renderer.render(scene,camera);else composer.render();
-  if(!firstFrame&&renderer.info.render.calls>0){firstFrame=true;window.sceneBoot?.ready();document.querySelector('#loading')?.remove();startTextureLoading();}
+  if(!firstFrame&&renderer.info.render.calls>0){firstFrame=true;window.sceneBoot?.ready();startTextureLoading();}
 }
 function resize(){const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);if(!mobileDevice)composer.setSize(r.width,r.height);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
 if(typeof ResizeObserver==='function')new ResizeObserver(resize).observe(canvas);else window.addEventListener('resize',resize,{passive:true});
 mobileTextureBudget(scene);resize();season();atmosphere();exterior();document.querySelector('#status').textContent='9 家可进入店铺 · 麻辣烫 / 炸串摊';requestAnimationFrame(render);
 // Read-only diagnostics used to verify the actual scene graph and renderer.
-window.sceneQA=()=>({textures:textureStatus(),contextLost:renderer.getContext().isContextLost(),gpuTextures:renderer.info.memory.textures,state:{...state},audio:soundscape.debugState(),stores:[...stores.values()].map(s=>({id:s.id,visible:s.root.visible,levels:s.floors.map(f=>({visible:f.floor.visible,front:f.front.visible,roof:f.roof.visible,insideBuilt:f.insideBuilt,insideVisible:f.inside.visible,previewVisible:f.preview?.visible||false,previewMeshes:f.preview?(()=>{let n=0;f.preview.traverse(o=>{if(o.isMesh)n++;});return n;})():0}))})),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,screenCount:screens.length,roomLights:lamps.filter(l=>l.type==='room').length,canvas:[canvas.width,canvas.height]});
+window.sceneQA=()=>({textures:textureStatus(),contextLost:renderer.getContext().isContextLost(),gpuTextures:renderer.info.memory.textures,state:{...state},audio:soundscape.debugState(),stores:[...stores.values()].map(s=>({id:s.id,visible:s.root.visible,levels:s.floors.map(f=>({visible:f.floor.visible,front:f.front.visible,roof:f.roof.visible,insideBuilt:f.insideBuilt,insideVisible:f.inside.visible,streetDetailed:Boolean(f.streetDetailed),previewVisible:f.preview?.visible||false,previewMeshes:f.preview?(()=>{let n=0;f.preview.traverse(o=>{if(o.isMesh)n++;});return n;})():0}))})),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,screenCount:screens.length,roomLights:lamps.filter(l=>l.type==='room').length,canvas:[canvas.width,canvas.height]});
 
 }
 startScene().catch(error=>{window.sceneBoot?.fail(error.message||String(error));console.error(error);});
