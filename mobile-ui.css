@@ -100,3 +100,9 @@ body.scene-is-loading #scene { filter: blur(7px) saturate(.8); }
 @media (prefers-reduced-motion: reduce) { .loading-street i, .loading-street b { animation: none; } #scene { transition: none; } }
 
 body.scene-is-loading #scene, body.scene-is-loading #controlPanel { pointer-events: none; }
+
+.texture-progress-details { white-space: pre-line; max-width: 290px; font-size: 12px; line-height: 1.7; color: #e2d6c2; }
+.texture-loading-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 290px; }
+.texture-loading-actions[hidden] { display: none; }
+#loading .texture-loading-actions button { font-size: 12px; padding: 8px 10px; min-height: 36px; }
+#loading textarea { max-width: 260px; height: 90px; }
